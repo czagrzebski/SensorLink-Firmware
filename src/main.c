@@ -1,7 +1,7 @@
 /**
  * @file main.c
  * @author Creed Zagrzebski (czagrzebski@gmail.com)
- * @brief Core application logic for SensorLink ESP32
+ * @brief Core application logic for ESP32 SensorLink 
  * @version 0.1
  * @date 2023-12-23
  * 
@@ -11,61 +11,45 @@
 
 #include "nvs_flash.h"
 #include "sdkconfig.h"
-#include "esp_wifi.h"
 #include "esp_log.h"
 #include "string.h"
-#include "esp_mac.h"
+#include "stdlib.h"
+#include "esp_event.h"
+#include <esp_http_server.h>
+#include "wifi.h"
 
-#define AP_SSID "ESP32"
-#define AP_PASSPHRASE "123456789"
+#include "lwip/err.h"
+#include "lwip/sys.h"
 
 const char* TAG = "main";
 
-void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
-    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
-        ESP_LOGI(TAG, "station "MACSTR" join, AID=%d",
-                 MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
-        ESP_LOGI(TAG, "station "MACSTR" leave, AID=%d",
-                 MAC2STR(event->mac), event->aid);
-    }
+esp_err_t hello_handler(httpd_req_t *req) {
+    const char resp[] = "Hello World!";
+    ESP_LOGI(TAG, "Request received!");
+    httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
 }
 
-void init_wifi_ap() {
-    // Initialize the TCP/IP stack 
-    // Serves as an intermediary between the IO driver and network protocol stacks  
-    ESP_LOGI(TAG, "Initializing the TCP/IP stack...");
-    ESP_ERROR_CHECK(esp_netif_init());
-    esp_netif_create_default_wifi_ap();
+/* URI handler structure for GET /uri */
+httpd_uri_t uri_get = {
+    .uri      = "/uri",
+    .method   = HTTP_GET,
+    .handler  = hello_handler,
+    .user_ctx = NULL
+};
 
-    // Create an event loop to handle WiFi events
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+// Start the web server
+httpd_handle_t start_webserver(void) {
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    httpd_handle_t server = NULL;
 
-    // Initialize the WiFi stack in Access Point mode with the default configuration
-    wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
+    if(httpd_start(&server, &config) == ESP_OK) {
+        // Register URI handlers
+        httpd_register_uri_handler(server, &uri_get);
+        return server;
+    }
 
-    // Register the WiFi event handler to handle WiFi events
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-
-    // Union that contains the configuration of the WiFi Access Point
-    wifi_config_t wifi_config = {
-        .ap = {
-            .ssid = AP_SSID,
-            .ssid_len = strlen(AP_SSID),
-            .password = AP_PASSPHRASE,
-            .max_connection = 4,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK,
-        },
-    };
-
-    ESP_LOGI(TAG, "Setting WiFi AP configuration SSID");
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
-    ESP_LOGI(TAG, "Starting WiFi Access Point...");
-    ESP_ERROR_CHECK(esp_wifi_start());
+    return NULL;
 }
 
 void app_main() {
@@ -74,7 +58,7 @@ void app_main() {
     esp_err_t ret = nvs_flash_init();
     if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         // If the flash memory is full, erase it and try again
-        ESP_LOGI(TAG, "Erasing NVS flash memory...");
+        ESP_LOGE(TAG, "NVS flash memory is full, erasing and trying again...");
         nvs_flash_erase();
         ret = nvs_flash_init();
     }
@@ -82,6 +66,19 @@ void app_main() {
     ESP_ERROR_CHECK(ret);
 
     // Initialize the WiFi Access Point
-    init_wifi_ap();
+    wifi_init_softap();
 
+    // Start the web server
+    ESP_LOGI(TAG, "Starting the web server...");
+    httpd_handle_t server = start_webserver();
+    if(server == NULL) {
+        ESP_LOGE(TAG, "Failed to start the web server!");
+        return;
+    }
+    ESP_LOGI(TAG, "Web server started successfully!");
+
+    // Wait for the web server to be stopped
+    while(server != NULL) {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
 }

@@ -1,0 +1,12 @@
+menu "Wi-Fi Configuration Menu"
+config AP_SSID
+        string "AP SSID"
+        default "SensorLink"
+        help
+            Type in the SSID for the AP
+config AP_PASS
+        string "AP Password"
+        default "123456789"
+        help
+            Type in the password for the AP
+endmenu
