@@ -16,6 +16,7 @@ extern esp_adc_cal_characteristics_t adc1_chars;
 esp_err_t index_handler(httpd_req_t *req);
 esp_err_t ws_handler(httpd_req_t *req);
 esp_err_t version_handler(httpd_req_t *req);
+esp_err_t toggle_led_handler(httpd_req_t *req);
 esp_err_t chart_js_handler(httpd_req_t *req);
 
 // Util Functions

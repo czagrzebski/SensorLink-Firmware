@@ -75,6 +75,8 @@ void app_main() {
     // Configure the ADC0 channel with the default configuration attenuation
     ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_11));
 
+    gpio_set_direction(OUTPUT_GPIO_PIN, GPIO_MODE_INPUT_OUTPUT); 
+
     // Create a task to broadcast a random value every second
     xTaskCreate(broadcast_adc_values, "broadcast_adc_values", 4096, NULL, 5, NULL);
 

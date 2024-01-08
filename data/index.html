@@ -52,18 +52,22 @@
         }
       
         .card-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Grid layout for cards */
+            display: flex;
+            flex-wrap: wrap;
             gap: 20px;
             padding: 20px;
-            max-width: 1200px; /* Max width for the grid */
-            margin: 0 auto;
+            justify-content: center; /* Align items to the start */
+            align-items: stretch; /* Stretch items to fill the container */
         }
         .card {
             background-color: white;
             border-radius: 5px;
             padding: 20px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            flex: 1 1 300px; /* flex-grow, flex-shrink, flex-basis */
+            /* Min and max width for responsiveness and to avoid too small or large cards */
+            min-width: 250px; /* Minimum width of the cards */
+            max-width: 330px; /* Maximum width of the cards, adjust as needed */
         }
         .card h1 {
             margin-top: 0;
@@ -75,6 +79,17 @@
         .version {
             margin-left: 10px;
         }
+
+        .footer {
+            background-color: #333; /* Dark background for the footer */
+            color: white; /* Light text color for visibility */
+            text-align: center; /* Center-align the text */
+            padding: 10px 0; /* Padding above and below text */
+            position: absolute; /* Positioning at the bottom */
+            width: 100%; /* Take the full width of the viewport */
+            bottom: 0; /* Stick to the bottom */
+        }
+        
     </style>
     <script src="http://192.168.4.1/chartjs"></script>
 </head>
@@ -95,40 +110,36 @@
     </nav>
     <div class="card-container">
         <div class="card">
-            <h1>Analog Sensor 1</h1>
-            <p>Type: Input</p>
+            <h1>I/O Device 1</h1>
+            <p>Type: Analog Input</p>
             <p>Channel: ADC1_CHANNEL_0 </p>
             <p>Attentuation: 11dB</p>
             <p>Value: <span id="sensor1">--</span> mV</p>
             <canvas id="sensor1Graph" width="400" height="300"></canvas>
         </div>
         <div class="card">
-            <h1>Analog Sensor 2</h1>
-            <p>Type: Input</p>
+            <h1>I/O Device 2</h1>
+            <p>Type: Analog Input</p>
             <p>Channel: ADC1_CHANNEL_1 </p>
             <p>Attentuation: 0dB</p>
             <p>Value: <span id="sensor2">--</span> mV</p>
         </div>
         <div class="card">
-            <h1>Analog Sensor 3</h1>
-            <p>Type: Input</p>
-            <p>Channel: ADC1_CHANNEL_2 </p>
-            <p>Attentuation: 0dB</p>
-            <p>Value: <span id="sensor2">--</span> mV</p>
-        </div>
-        <div class="card">
-            <h1>Analog Sensor 4</h1>
-            <p>Type: Input</p>
-            <p>Channel: ADC1_CHANNEL_3 </p>
-            <p>Attentuation: 0dB</p>
-            <p>Value: <span id="sensor2">--</span> mV</p>
+            <h1>I/O Device 3</h1>
+            <p>Type: Digital Output</p>
+            <p>Channel: GPIO_NUM_22</p>
+            <p>State: <span id="led_state">OFF</span></p>
+            <br>
+            <button onclick="toggleLEDON()">ON</button>
+            <button onclick="toggleLEDOFF()">OFF</button>
         </div>
         <!-- Add more cards for different sensors -->
     </div>
     <script>
-       // Function to add new data to the graph
-       let labels = []; // Replace with actual labels, if available
+        // Function to add new data to the graph
+        let labels = []; // Replace with actual labels, if available
         let dataPoints = []; // Initially empty, will be populated with incoming data
+        let lastValueAboveThreshold = false; // Edge detection
 
         function addData(chart, label, data) {
             if (chart.data.labels.length > 8) { // Limit number of data points
@@ -163,6 +174,12 @@
                     duration: 0
                 },
                 scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Timestamp'
+                        }
+                    },
                     y: {
                         responsive: false, // Prevent chart from 
                         animation: false, // Disable animations
@@ -171,9 +188,11 @@
                         max: 3300, // Maximum value
                         ticks: {
                             stepSize: 660 // Step size
+                        },
+                        title: {
+                            display: true,
+                            text: 'Voltage (mV)'
                         }
-                        
-                      
                     }
                 }
             }
@@ -188,14 +207,29 @@
 
         // Event listener to be called when a message is received from the server
         ws.onmessage = function(event) {
-            let receivedData = parseInt(event.data); // Replace with actual data processing
+            let receivedData = JSON.parse(event.data)
             let currentLabel = new Date().toLocaleTimeString(); // Using current time as label
-        
+
+            let adc = receivedData["adc"]
+
             // Add data to the graph
-            addData(sensorChart, currentLabel, receivedData);
+            addData(sensorChart, currentLabel, adc);
+
+            if (adc > 3000 && !lastValueAboveThreshold) {
+                // Do something when the value goes above 2000
+                alert("Action Triggered");
+                lastValueAboveThreshold = true;
+            } else if (adc < 3000 && lastValueAboveThreshold) {
+                // Do something when the value goes below 2000
+                lastValueAboveThreshold = false;
+            }
+
+            console.log(receivedData)
 
             // Update label and value
-            document.getElementById('sensor1').textContent = receivedData;
+            document.getElementById('sensor1').textContent = receivedData["adc"];
+
+            document.getElementById('led_state').textContent = receivedData["pin"] ? "ON" : "OFF";
         };
 
         // Event listener for any errors that occur
@@ -216,10 +250,26 @@
             document.getElementById('current-time').textContent = formattedTime;
         }
 
+        function toggleLEDOFF() {
+            // Toggle off using AJAX http GET request with pin number and state
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET", "/led?pin=22&state=0", true);
+            xhttp.send();
+        }
+
+        function toggleLEDON() {
+            // Toggle on using AJAX http GET request with pin number and state
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET", "/led?pin=22&state=1", true);
+            xhttp.send();
+        }
+
         updateTime();
         setInterval(updateTime, 1000);
-
-        
     </script>
+    <footer class="footer">
+        <p>This is early access software running on ESP-IDF v6.</p>
+    </footer>
+    
 </body>
 </html>

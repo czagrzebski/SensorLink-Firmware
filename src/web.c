@@ -10,6 +10,11 @@
 #include "esp_adc_cal.h"
 #include "driver/adc.h"
 
+// Import MIN function
+#ifndef MIN
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#endif
+
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
@@ -47,6 +52,13 @@ httpd_uri_t chart_js_uri = {
     .uri      = "/chartjs",
     .method   = HTTP_GET,
     .handler  = chart_js_handler,
+    .user_ctx = NULL
+};
+
+httpd_uri_t toggle_led_uri = {
+    .uri      = "/led",
+    .method   = HTTP_GET,
+    .handler  = toggle_led_handler,
     .user_ctx = NULL
 };
 
@@ -159,6 +171,7 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server_handle, &ws_uri);
         httpd_register_uri_handler(server_handle, &uri_version);
         httpd_register_uri_handler(server_handle, &chart_js_uri);
+        httpd_register_uri_handler(server_handle, &toggle_led_uri);
         return server_handle;
     }
 
@@ -197,6 +210,34 @@ char* replace_variable(const char* source, const char* placeholder, const char* 
     return result;
 }
 
+esp_err_t toggle_led_handler(httpd_req_t *req) {
+   // Get query for pin number and state. Toggle the pin based on state (HTTP GET REQUEST)
+    char buf[128];
+    int buf_len = 128;
+    int ret = httpd_req_get_url_query_str(req, buf, buf_len);
+    if (ret == ESP_OK) {
+        ESP_LOGI(WEB_TAG, "Found URL query => %s", buf);
+        char param[32];
+        // Get pin number
+        ret = httpd_query_key_value(buf, "pin", param, sizeof(param));
+        if (ret == ESP_OK) {
+            int pin = atoi(param);
+            ESP_LOGI(WEB_TAG, "Pin Number => %d", pin);
+            // Get state
+            ret = httpd_query_key_value(buf, "state", param, sizeof(param));
+            if (ret == ESP_OK) {
+                int state = atoi(param);
+                ESP_LOGI(WEB_TAG, "State => %d", state);
+                gpio_set_level(pin, state);
+                httpd_resp_send(req, "OK", 2);
+                return ESP_OK;
+            }
+        }
+    }
+    httpd_resp_send_404(req);
+    return ESP_FAIL;
+}
+
 // Broadcast a random value every second
 void broadcast_adc_values(void* pvParameters) {
     while(true) {
@@ -210,15 +251,16 @@ void broadcast_adc_values(void* pvParameters) {
 
         int voltage = esp_adc_cal_raw_to_voltage(adc_reading, &adc1_chars);
 
-        // Create a packet containing the integer as a string
-        uint8_t buf[128] = { 0 };
+        // Create a packet containing the integer as a string in JSON format with the current
+        // digital state of pin 22
+        char buf[128];
+        sprintf(buf, "{\"adc\": %d, \"pin\": %d}", voltage, gpio_get_level(22));
         httpd_ws_frame_t ws_pkt;
         memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-        sprintf((char*)buf, "%d", voltage);
-        ws_pkt.payload = buf;
-        ws_pkt.len = strlen((char*)buf);
+        ws_pkt.payload = (uint8_t*)buf;
+        ws_pkt.len = strlen(buf);
         ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-       
+
         // Send the packet to all connected clients
         httpd_ws_send_frame_to_all_clients(&ws_pkt);
 
