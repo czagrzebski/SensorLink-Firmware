@@ -34,6 +34,7 @@ httpd_handle_t server_handle = NULL;
 #endif
 
 esp_err_t ws_handler(httpd_req_t *req);
+char* replace_variable(const char* source, const char* placeholder, const char* replacement);
 
 /*
  * Structure holding server handle
@@ -83,11 +84,33 @@ esp_err_t index_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
-    // Read file contents and send them to the client
-    char buffer[1024];
-    size_t bytesRead;
-    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
-        httpd_resp_send_chunk(req, buffer, bytesRead);
+    // Read the line by line, check for placeholders and replace them
+    char line[1024];
+    while(fgets(line, sizeof(line), file)) {
+        char* newLine = replace_variable(line, "{{GIT_COMMIT_HASH}}", GIT_COMMIT_HASH);
+        httpd_resp_send_chunk(req, newLine, strlen(newLine));
+        free(newLine);
+    }
+
+    fclose(file);
+    httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
+    return ESP_OK;
+}
+
+esp_err_t chart_js_handler(httpd_req_t *req) {
+    // Open file from SPIFFS
+    ESP_LOGI(TAG, "Request received!");
+
+    FILE* file = fopen("/spiffs/chart.js", "r");
+    if (file == NULL) {
+        httpd_resp_send_404(req);
+        return ESP_FAIL;
+    }
+
+    // Read the line by line, check for placeholders and replace them
+    char line[1024];
+    while(fgets(line, sizeof(line), file)) {
+        httpd_resp_send_chunk(req, line, strlen(line));
     }
 
     fclose(file);
@@ -146,6 +169,13 @@ httpd_uri_t uri_version = {
     .is_websocket = true
 };
 
+httpd_uri_t chart_js_uri = {
+    .uri      = "/chartjs",
+    .method   = HTTP_GET,
+    .handler  = chart_js_handler,
+    .user_ctx = NULL
+};
+
 // Start the web server
 httpd_handle_t start_webserver(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -155,18 +185,56 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server_handle, &uri_get);
         httpd_register_uri_handler(server_handle, &ws_uri);
         httpd_register_uri_handler(server_handle, &uri_version);
+        httpd_register_uri_handler(server_handle, &chart_js_uri);
         return server_handle;
     }
 
     return NULL;
 }
 
+char* replace_variable(const char* source, const char* placeholder, const char* replacement) {
+    const char *p = source;
+    int count = 0;
+    int placeholderLen = strlen(placeholder);
+    int replacementLen = strlen(replacement);
+    
+    // Counting the number of times the placeholder occurs in the source
+    while ((p = strstr(p, placeholder))) {
+        p += placeholderLen;
+        count++;
+    }
+    
+    // Allocating memory for the new string
+    int newSize = strlen(source) + count * (replacementLen - placeholderLen) + 1;
+    char *result = malloc(newSize);
+    if (result == NULL) return NULL;
+    
+    char *newStr = result;
+    while (*source) {
+        if (strstr(source, placeholder) == source) {
+            memcpy(newStr, replacement, replacementLen);
+            newStr += replacementLen;
+            source += placeholderLen;
+        } else {
+            *newStr++ = *source++;
+        }
+    }
+    *newStr = '\0';
+
+    return result;
+}
+
 // Broadcast a random value every second
 void broadcast_rand_value(void* pvParameters) {
     while(true) {
-        // Generate a random value
-        int adc_reading = adc1_get_raw(ADC1_CHANNEL_0);
-        // Optional: Convert adc_reading to voltage in mV for display
+
+        // Get 64 samples from the ADC
+        int adc_reading = 0;
+        for(int i = 0; i < 64; i++) {
+            adc_reading += adc1_get_raw(ADC1_CHANNEL_0);
+        }
+        adc_reading /= 64; 
+
         int voltage = esp_adc_cal_raw_to_voltage(adc_reading, &adc1_chars);
 
         // Create a packet containing the integer as a string
