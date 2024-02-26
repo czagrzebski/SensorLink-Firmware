@@ -12,15 +12,15 @@
 #include "driver/adc.h"
 
 // Import MIN function
-/* #ifndef MIN
+#ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
-#endif */
+#endif 
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
 // Define GIT_COMMIT_HASH if it's not already defined
-// stops the compiler from complaining about undefined variables
+// stops GCC from whining about an undefined macro 
 #ifndef GIT_COMMIT_HASH
 #define GIT_COMMIT_HASH "undefined"
 #endif
@@ -179,7 +179,7 @@ esp_err_t wifi_config_handler(httpd_req_t *req) {
     }
 
     // Save the Wi-Fi credentials to NVS
-    save_wifi_credentials(ssid, password);
+    save_wifi_credentials_to_nvs(ssid, password);
 
     // Send a response
     httpd_resp_send(req, "OK", 2);

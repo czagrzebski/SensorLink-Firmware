@@ -95,4 +95,5 @@ void app_main() {
     // Unmount the SPIFFS
     ESP_LOGI(TAG, "Unmounting the SPIFFS...");
     esp_vfs_spiffs_unregister(NULL);
+
 }

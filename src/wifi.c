@@ -17,12 +17,12 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
         ESP_LOGI(WIFI_TAG, "station "MACSTR" leave, AID=%d",
                  MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_STA_CONNECTED) {
-        ESP_LOGI(WIFI_TAG, "Connected to Station Network");
+        ESP_LOGI(WIFI_TAG, "Connected to Station Network. Stopping AP Server...");
         // Stop the AP Mode since we're connected to the Station Network
         stop_wifi_ap();
     } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
         wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
-        ESP_LOGI(WIFI_TAG, "Disconnected from Station Network");
+        ESP_LOGI(WIFI_TAG, "Disconnected from Station Network. Starting AP Mode...");
         // Start AP Mode since we're disconnected from the Station Network
         wifi_init_softap();
     }
@@ -35,7 +35,7 @@ wifi_mode_t get_wifi_mode(void) {
     return mode;
 }
 
-void save_wifi_credentials(char *ssid, char *password) {
+void save_wifi_credentials_to_nvs(char *ssid, char *password) {
     // Save Wi-Fi Configuration to NVS and restart
     nvs_handle_t nvs_handle;
     esp_err_t err;
@@ -130,7 +130,6 @@ void wifi_init_sta(char* ssid, char* password) {
             .scan_method = WIFI_ALL_CHANNEL_SCAN,
             .failure_retry_cnt = 3,
             .threshold.authmode = WIFI_AUTH_WPA2_WPA3_PSK,
-            .sae_pwe_h2e = WPA3_SAE_PWE_BOTH
         },
     };
 

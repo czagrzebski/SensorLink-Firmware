@@ -12,6 +12,6 @@ void wifi_init_sta(char* ssid, char* password);
 void wifi_init_softap(void);
 void init_wifi(void);
 void stop_wifi_ap(void);
-void save_wifi_credentials(char *ssid, char *password);
+void save_wifi_credentials_to_nvs(char *ssid, char *password);
 
 #endif
