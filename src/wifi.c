@@ -28,6 +28,13 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
     }
 }
 
+wifi_mode_t get_wifi_mode(void) {
+    // Get the current Wi-Fi mode (STA or AP) from wifi driver
+    wifi_mode_t mode;
+    esp_wifi_get_mode(&mode);
+    return mode;
+}
+
 void save_wifi_credentials(char *ssid, char *password) {
     // Save Wi-Fi Configuration to NVS and restart
     nvs_handle_t nvs_handle;
@@ -59,12 +66,8 @@ void save_wifi_credentials(char *ssid, char *password) {
 }
 
 void init_wifi() {
-    // Check NVS for Wi-Fi Configuration (Username and Password)
-    // If it doesn't exist, start softAP
-    // If it does exist, start station mode
-
     // Get Wi-Fi Configuration from NVS
-    wifi_mode mode = STA_MODE;
+    wifi_mode_t mode = WIFI_MODE_STA;
     nvs_handle_t nvs_handle;
     esp_err_t err;
     size_t required_size;
@@ -72,7 +75,7 @@ void init_wifi() {
     err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
-        mode = AP_MODE;
+        mode = WIFI_MODE_AP;
     } else {
         ESP_LOGI(WIFI_TAG, "Reading Wi-Fi configuration from NVS");
     }
@@ -80,7 +83,7 @@ void init_wifi() {
     // Failed to get size of ssid, so we can't read it
     err = nvs_get_str(nvs_handle, "ssid", NULL, &required_size);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        mode = AP_MODE;
+        mode = WIFI_MODE_AP;
         ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
     }
 
@@ -90,13 +93,13 @@ void init_wifi() {
     // Read the stored Wi-Fi credentials from NVS
     err = nvs_get_str(nvs_handle, "ssid", ssid, &required_size);
     if (err != ESP_OK) {
-        mode = AP_MODE;
+        mode = WIFI_MODE_AP;
         ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
     }
   
     err = nvs_get_str(nvs_handle, "password", password, &required_size);
     if (err != ESP_OK) {
-        mode = AP_MODE;
+        mode = WIFI_MODE_AP;
         ESP_LOGE(WIFI_TAG, "Error (%s) reading password from NVS", esp_err_to_name(err));
     }
 
@@ -106,9 +109,9 @@ void init_wifi() {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     // If we're in AP mode, start the softAP
-    if (mode == AP_MODE) {
+    if (mode == WIFI_MODE_AP) {
         wifi_init_softap();
-    } else if (mode == STA_MODE) {
+    } else if (mode == WIFI_MODE_STA) {
         wifi_init_sta(ssid, password);
     }
 
