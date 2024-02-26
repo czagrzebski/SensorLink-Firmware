@@ -69,8 +69,8 @@ void app_main() {
     // Initialize the Serial Peripheral Interface Flash File System (SPIFFS)
     init_spiffs();
     
+    // Initialize the WiFi connection and connect to the network
     init_wifi();
-    //wifi_init_softap();
 
     // Start the web server
     ESP_LOGI(TAG, "Starting the web server...");

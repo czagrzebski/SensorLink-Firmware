@@ -97,7 +97,6 @@
         
         
     </style>
-    <script src="http://192.168.4.1/chartjs"></script>
 </head>
 <body>
     <div class="content">
@@ -115,171 +114,46 @@
                 <span id="version">{{GIT_COMMIT_HASH}}</span>
             </div>
         </nav>
+        <h3 style="text-align: center;">Wi-Fi Network Manager</h3>
+        <!-- Form for Network SSID and Password -->
         <div class="card-container">
             <div class="card">
-                <h1>I/O Device 1</h1>
-                <p>Type: Analog Input</p>
-                <p>Channel: ADC1_CHANNEL_0 </p>
-                <p>Attentuation: 11dB</p>
-                <p>Value: <span id="sensor1">--</span> mV</p>
-                <canvas id="sensor1Graph" width="400" height="300"></canvas>
+                <h1>Connect to Wi-Fi</h1>
+                <form id="wifi-form">
+                    <p>
+                        <label for="ssid">SSID:</label>
+                        <input type="text" id="ssid" name="ssid" required>
+                    </p>
+                    <p>
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" required>
+                    </p>
+                    <p>
+                        <button type="submit">Save Wi-Fi Credentials and Reboot</button>
+                    </p>
+                </form>
             </div>
             <div class="card">
-                <h1>I/O Device 2</h1>
-                <p>Type: Analog Input</p>
-                <p>Channel: ADC1_CHANNEL_1 </p>
-                <p>Attentuation: 0dB</p>
-                <p>Value: <span id="sensor2">--</span> mV</p>
-            </div>
-            <div class="card">
-                <h1>I/O Device 3</h1>
-                <p>Type: Digital Output</p>
-                <p>Channel: GPIO_NUM_22</p>
-                <p>State: <span id="led_state">OFF</span></p>
-                <br>
-                <button onclick="toggleLEDON()">ON</button>
-                <button onclick="toggleLEDOFF()">OFF</button>
-            </div>
-            <!-- Add more cards for different sensors -->
-        </div>
-        <script>
-            // Function to add new data to the graph
-            let labels = []; // Replace with actual labels, if available
-            let dataPoints = []; // Initially empty, will be populated with incoming data
-            let lastValueAboveThreshold = false; // Edge detection
-            let count = 0; // Counter for labels
-
-            function addData(chart, label, data) {
-                if (chart.data.labels.length > 8) { // Limit number of data points
-                    chart.data.labels.shift(); // Remove first label
-                    chart.data.datasets.forEach((dataset) => {
-                        dataset.data.shift(); // Remove first data point
-                    });
-                }
-                chart.data.labels.push(label); // Add new label at end
-                chart.data.datasets.forEach((dataset) => {
-                    dataset.data.push(data); // Add new data at end
-                });
-                chart.update(); // Update the chart
-            }
-
-            // Initialize the chart
-            let ctx = document.getElementById('sensor1Graph').getContext('2d');
-            let sensorChart = new Chart(ctx, {
-                type: 'line', // Type of chart
-                data: {
-                    labels: labels, // X-axis labels
-                    datasets: [{
-                        label: 'Sensor 1 Data', // Legend name
-                        data: dataPoints, // Y-axis data
-                        fill: false,
-                        borderColor: 'rgb(75, 192, 192)', // Line color
-                        tension: 0.1 // Smoothness of line
-                    }]
-                },
-                options: {
-                    animation: {
-                        duration: 0
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Timestamp'
-                            }
-                        },
-                        y: {
-                            responsive: false, // Prevent chart from 
-                            animation: false, // Disable animations
-                            maintainAspectRatio: false, // Allow custom aspect ratio
-                            min: 0, // Minimum value
-                            max: 3300, // Maximum value
-                            ticks: {
-                                stepSize: 660 // Step size
-                            },
-                            title: {
-                                display: true,
-                                text: 'Voltage (mV)'
-                            }
-                        }
-                    }
-                }
-            });
-                    // Establish a connection with the WebSocket server
-            const ws = new WebSocket('ws://192.168.4.1/ws'); 
-
-            // Event listener to be called when the WebSocket connection is opened
-            ws.onopen = function() {
-                console.log("Connected to the WebSocket server");
-            };
-
-            // Event listener to be called when a message is received from the server
-            ws.onmessage = function(event) {
-                let receivedData = JSON.parse(event.data)
-                let currentLabel = new Date().toLocaleTimeString(); // Using current time as label
-
-                let adc = parseInt(receivedData["adc"])
-
-                // Add data to the graph
-                addData(sensorChart, currentLabel, adc);
-
-                if (adc > 3000 && !lastValueAboveThreshold) {
-                    // Do something when the value goes above 2000
-                    lastValueAboveThreshold = true;
-                
-                } else if (adc < 3000 && lastValueAboveThreshold) {
-                    // Do something when the value goes below 3000
-                    lastValueAboveThreshold = false;
-                    count++;
-                }
-
-                console.log(receivedData)
-
-                // Update label and value
-                document.getElementById('sensor1').textContent = receivedData["adc"];
-
-                document.getElementById('led_state').textContent = receivedData["pin"] ? "ON" : "OFF";
-            };
-
-            // Event listener for any errors that occur
-            ws.onerror = function(error) {
-                console.log("WebSocket Error: " + error);
-                alert("Failed to establish connection with the SensorLink Device");
-            };
-
-            // Optionally, handle the WebSocket closing
-            ws.onclose = function() {
-                console.log("Disconnected from the WebSocket server");
-                alert("Lost connection with the SensorLink Device");
-            };
-
-            function updateTime() {
-                const now = new Date();
-                const formattedTime = now.toLocaleTimeString();
-                document.getElementById('current-time').textContent = formattedTime;
-            }
-
-            function toggleLEDOFF() {
-                // Toggle off using AJAX http GET request with pin number and state
-                var xhttp = new XMLHttpRequest();
-                xhttp.open("GET", "/led?pin=22&state=0", true);
-                xhttp.send();
-            }
-
-            function toggleLEDON() {
-                // Toggle on using AJAX http GET request with pin number and state
-                var xhttp = new XMLHttpRequest();
-                xhttp.open("GET", "/led?pin=22&state=1", true);
-                xhttp.send();
-            }
-
-            updateTime();
-            setInterval(updateTime, 1000);
-        </script>
+                <h1>Access Point</h1>
+                <p>The device will only be accessible via the Access Point when Wi-Fi credentials are not provided or the station network is unavailable.</p>
+                <p>To permanently switch to Access Point mode, remove the Wi-Fi credentials and reboot the device.</p>
+                <button type="submit">Remove Wi-Fi Credentials and Reboot</button>
+                </div>
+                </div>
     </div>
     <footer class="footer">
         <p>Warning! This is a early development build. Some features may not work as expected.</p>
     </footer>
     
+    <script>
+        function updateTime() {
+            const now = new Date();
+            const formattedTime = now.toLocaleTimeString();
+            document.getElementById('current-time').textContent = formattedTime;
+        }
+
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
 </body>
 </html>
