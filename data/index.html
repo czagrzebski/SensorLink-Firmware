@@ -14,6 +14,13 @@
             margin: 0;
             padding: 0;
             background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .content {
+            flex: 1;
+            /* Add padding or margins as needed */
         }
         nav {
             background-color: #333;
@@ -84,189 +91,195 @@
             background-color: #333; /* Dark background for the footer */
             color: white; /* Light text color for visibility */
             text-align: center; /* Center-align the text */
-            padding: 10px 0; /* Padding above and below text */
-            position: absolute; /* Positioning at the bottom */
+            padding: 20px 0; /* Padding above and below text */
             width: 100%; /* Take the full width of the viewport */
-            bottom: 0; /* Stick to the bottom */
         }
+        
         
     </style>
     <script src="http://192.168.4.1/chartjs"></script>
 </head>
 <body>
-    <nav>
-        <h1>SensorLink</h1> <!-- Mention SensorLink in the title -->
-        <div id="status-items">
-            <svg style="color: white; margin-right: 5px" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-wifi" viewBox="0 0 16 16"> <path d="M15.384 6.115a.485.485 0 0 0-.047-.736A12.444 12.444 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.518.518 0 0 0 .668.05A11.448 11.448 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049z" fill="white"></path> <path d="M13.229 8.271a.482.482 0 0 0-.063-.745A9.455 9.455 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065zm-2.183 2.183c.226-.226.185-.605-.1-.75A6.473 6.473 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.478 5.478 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091l.016-.015zM9.06 12.44c.196-.196.198-.52-.04-.66A1.99 1.99 0 0 0 8 11.5a1.99 1.99 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z" fill="white"></path> </svg>
-            <span id="ssid">ESP32Link</span> <!-- Display SSID here -->
-            <svg style="margin-left: 10px; margin-right: 5px;"xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
-                <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
-                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
-            </svg>
-            <span id="current-time"></span> <!-- Display current time here -->
-            <svg style="color: white; margin-left: 10px; margin-right: 5px" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear" viewBox="0 0 16 16"> <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z" fill="white"></path> <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z" fill="white"></path> </svg>
-            <span id="version">{{GIT_COMMIT_HASH}}</span>
+    <div class="content">
+        <nav>
+            <h1>SensorLink</h1> <!-- Mention SensorLink in the title -->
+            <div id="status-items">
+                <svg style="color: white; margin-right: 5px" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-wifi" viewBox="0 0 16 16"> <path d="M15.384 6.115a.485.485 0 0 0-.047-.736A12.444 12.444 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.518.518 0 0 0 .668.05A11.448 11.448 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049z" fill="white"></path> <path d="M13.229 8.271a.482.482 0 0 0-.063-.745A9.455 9.455 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065zm-2.183 2.183c.226-.226.185-.605-.1-.75A6.473 6.473 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.478 5.478 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091l.016-.015zM9.06 12.44c.196-.196.198-.52-.04-.66A1.99 1.99 0 0 0 8 11.5a1.99 1.99 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z" fill="white"></path> </svg>
+                <span id="ssid">SensorLinkAP</span> <!-- Display SSID here -->
+                <svg style="margin-left: 10px; margin-right: 5px;"xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
+                    <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
+                </svg>
+                <span id="current-time"></span> <!-- Display current time here -->
+                <svg style="color: white; margin-left: 10px; margin-right: 5px" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear" viewBox="0 0 16 16"> <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z" fill="white"></path> <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z" fill="white"></path> </svg>
+                <span id="version">{{GIT_COMMIT_HASH}}</span>
+            </div>
+        </nav>
+        <div class="card-container">
+            <div class="card">
+                <h1>I/O Device 1</h1>
+                <p>Type: Analog Input</p>
+                <p>Channel: ADC1_CHANNEL_0 </p>
+                <p>Attentuation: 11dB</p>
+                <p>Count: <span id="count">0</span></p>
+                <p>Value: <span id="sensor1">--</span> mV</p>
+                <canvas id="sensor1Graph" width="400" height="300"></canvas>
+            </div>
+            <div class="card">
+                <h1>I/O Device 2</h1>
+                <p>Type: Analog Input</p>
+                <p>Channel: ADC1_CHANNEL_1 </p>
+                <p>Attentuation: 0dB</p>
+                <p>Value: <span id="sensor2">--</span> mV</p>
+            </div>
+            <div class="card">
+                <h1>I/O Device 3</h1>
+                <p>Type: Digital Output</p>
+                <p>Channel: GPIO_NUM_22</p>
+                <p>State: <span id="led_state">OFF</span></p>
+                <br>
+                <button onclick="toggleLEDON()">ON</button>
+                <button onclick="toggleLEDOFF()">OFF</button>
+            </div>
+            <!-- Add more cards for different sensors -->
         </div>
-    </nav>
-    <div class="card-container">
-        <div class="card">
-            <h1>I/O Device 1</h1>
-            <p>Type: Analog Input</p>
-            <p>Channel: ADC1_CHANNEL_0 </p>
-            <p>Attentuation: 11dB</p>
-            <p>Value: <span id="sensor1">--</span> mV</p>
-            <canvas id="sensor1Graph" width="400" height="300"></canvas>
-        </div>
-        <div class="card">
-            <h1>I/O Device 2</h1>
-            <p>Type: Analog Input</p>
-            <p>Channel: ADC1_CHANNEL_1 </p>
-            <p>Attentuation: 0dB</p>
-            <p>Value: <span id="sensor2">--</span> mV</p>
-        </div>
-        <div class="card">
-            <h1>I/O Device 3</h1>
-            <p>Type: Digital Output</p>
-            <p>Channel: GPIO_NUM_22</p>
-            <p>State: <span id="led_state">OFF</span></p>
-            <br>
-            <button onclick="toggleLEDON()">ON</button>
-            <button onclick="toggleLEDOFF()">OFF</button>
-        </div>
-        <!-- Add more cards for different sensors -->
-    </div>
-    <script>
-        // Function to add new data to the graph
-        let labels = []; // Replace with actual labels, if available
-        let dataPoints = []; // Initially empty, will be populated with incoming data
-        let lastValueAboveThreshold = false; // Edge detection
+        <script>
+            // Function to add new data to the graph
+            let labels = []; // Replace with actual labels, if available
+            let dataPoints = []; // Initially empty, will be populated with incoming data
+            let lastValueAboveThreshold = false; // Edge detection
+            let count = 0; // Counter for labels
 
-        function addData(chart, label, data) {
-            if (chart.data.labels.length > 8) { // Limit number of data points
-                chart.data.labels.shift(); // Remove first label
+            function addData(chart, label, data) {
+                if (chart.data.labels.length > 8) { // Limit number of data points
+                    chart.data.labels.shift(); // Remove first label
+                    chart.data.datasets.forEach((dataset) => {
+                        dataset.data.shift(); // Remove first data point
+                    });
+                }
+                chart.data.labels.push(label); // Add new label at end
                 chart.data.datasets.forEach((dataset) => {
-                    dataset.data.shift(); // Remove first data point
+                    dataset.data.push(data); // Add new data at end
                 });
+                chart.update(); // Update the chart
             }
-            chart.data.labels.push(label); // Add new label at end
-            chart.data.datasets.forEach((dataset) => {
-                dataset.data.push(data); // Add new data at end
-            });
-            chart.update(); // Update the chart
-        }
 
-        // Initialize the chart
-        let ctx = document.getElementById('sensor1Graph').getContext('2d');
-        let sensorChart = new Chart(ctx, {
-            type: 'line', // Type of chart
-            data: {
-                labels: labels, // X-axis labels
-                datasets: [{
-                    label: 'Sensor 1 Data', // Legend name
-                    data: dataPoints, // Y-axis data
-                    fill: false,
-                    borderColor: 'rgb(75, 192, 192)', // Line color
-                    tension: 0.1 // Smoothness of line
-                }]
-            },
-            options: {
-                animation: {
-                    duration: 0
+            // Initialize the chart
+            let ctx = document.getElementById('sensor1Graph').getContext('2d');
+            let sensorChart = new Chart(ctx, {
+                type: 'line', // Type of chart
+                data: {
+                    labels: labels, // X-axis labels
+                    datasets: [{
+                        label: 'Sensor 1 Data', // Legend name
+                        data: dataPoints, // Y-axis data
+                        fill: false,
+                        borderColor: 'rgb(75, 192, 192)', // Line color
+                        tension: 0.1 // Smoothness of line
+                    }]
                 },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Timestamp'
-                        }
+                options: {
+                    animation: {
+                        duration: 0
                     },
-                    y: {
-                        responsive: false, // Prevent chart from 
-                        animation: false, // Disable animations
-                        maintainAspectRatio: false, // Allow custom aspect ratio
-                        min: 0, // Minimum value
-                        max: 3300, // Maximum value
-                        ticks: {
-                            stepSize: 660 // Step size
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Timestamp'
+                            }
                         },
-                        title: {
-                            display: true,
-                            text: 'Voltage (mV)'
+                        y: {
+                            responsive: false, // Prevent chart from 
+                            animation: false, // Disable animations
+                            maintainAspectRatio: false, // Allow custom aspect ratio
+                            min: 0, // Minimum value
+                            max: 3300, // Maximum value
+                            ticks: {
+                                stepSize: 660 // Step size
+                            },
+                            title: {
+                                display: true,
+                                text: 'Voltage (mV)'
+                            }
                         }
                     }
                 }
+            });
+                    // Establish a connection with the WebSocket server
+            const ws = new WebSocket('ws://192.168.4.1/ws'); 
+
+            // Event listener to be called when the WebSocket connection is opened
+            ws.onopen = function() {
+                console.log("Connected to the WebSocket server");
+            };
+
+            // Event listener to be called when a message is received from the server
+            ws.onmessage = function(event) {
+                let receivedData = JSON.parse(event.data)
+                let currentLabel = new Date().toLocaleTimeString(); // Using current time as label
+
+                let adc = parseInt(receivedData["adc"])
+
+                // Add data to the graph
+                addData(sensorChart, currentLabel, adc);
+
+                document.getElementById('count').textContent = count;
+
+                if (adc > 3000 && !lastValueAboveThreshold) {
+                    // Do something when the value goes above 2000
+                    lastValueAboveThreshold = true;
+                
+                } else if (adc < 3000 && lastValueAboveThreshold) {
+                    // Do something when the value goes below 3000
+                    lastValueAboveThreshold = false;
+                    count++;
+                }
+
+                console.log(receivedData)
+
+                // Update label and value
+                document.getElementById('sensor1').textContent = receivedData["adc"];
+
+                document.getElementById('led_state').textContent = receivedData["pin"] ? "ON" : "OFF";
+            };
+
+            // Event listener for any errors that occur
+            ws.onerror = function(error) {
+                console.log("WebSocket Error: " + error);
+                alert("Failed to establish connection with the SensorLink Device");
+            };
+
+            // Optionally, handle the WebSocket closing
+            ws.onclose = function() {
+                console.log("Disconnected from the WebSocket server");
+                alert("Lost connection with the SensorLink Device");
+            };
+
+            function updateTime() {
+                const now = new Date();
+                const formattedTime = now.toLocaleTimeString();
+                document.getElementById('current-time').textContent = formattedTime;
             }
-        });
-                // Establish a connection with the WebSocket server
-        const ws = new WebSocket('ws://192.168.4.1/ws'); 
 
-        // Event listener to be called when the WebSocket connection is opened
-        ws.onopen = function() {
-            console.log("Connected to the WebSocket server");
-        };
-
-        // Event listener to be called when a message is received from the server
-        ws.onmessage = function(event) {
-            let receivedData = JSON.parse(event.data)
-            let currentLabel = new Date().toLocaleTimeString(); // Using current time as label
-
-            let adc = receivedData["adc"]
-
-            // Add data to the graph
-            addData(sensorChart, currentLabel, adc);
-
-            if (adc > 3000 && !lastValueAboveThreshold) {
-                // Do something when the value goes above 2000
-                alert("Action Triggered");
-                lastValueAboveThreshold = true;
-            } else if (adc < 3000 && lastValueAboveThreshold) {
-                // Do something when the value goes below 2000
-                lastValueAboveThreshold = false;
+            function toggleLEDOFF() {
+                // Toggle off using AJAX http GET request with pin number and state
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("GET", "/led?pin=22&state=0", true);
+                xhttp.send();
             }
 
-            console.log(receivedData)
+            function toggleLEDON() {
+                // Toggle on using AJAX http GET request with pin number and state
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("GET", "/led?pin=22&state=1", true);
+                xhttp.send();
+            }
 
-            // Update label and value
-            document.getElementById('sensor1').textContent = receivedData["adc"];
-
-            document.getElementById('led_state').textContent = receivedData["pin"] ? "ON" : "OFF";
-        };
-
-        // Event listener for any errors that occur
-        ws.onerror = function(error) {
-            console.log("WebSocket Error: " + error);
-            alert("Failed to establish connection with the SensorLink Device");
-        };
-
-        // Optionally, handle the WebSocket closing
-        ws.onclose = function() {
-            console.log("Disconnected from the WebSocket server");
-            alert("Lost connection with the SensorLink Device");
-        };
-
-        function updateTime() {
-            const now = new Date();
-            const formattedTime = now.toLocaleTimeString();
-            document.getElementById('current-time').textContent = formattedTime;
-        }
-
-        function toggleLEDOFF() {
-            // Toggle off using AJAX http GET request with pin number and state
-            var xhttp = new XMLHttpRequest();
-            xhttp.open("GET", "/led?pin=22&state=0", true);
-            xhttp.send();
-        }
-
-        function toggleLEDON() {
-            // Toggle on using AJAX http GET request with pin number and state
-            var xhttp = new XMLHttpRequest();
-            xhttp.open("GET", "/led?pin=22&state=1", true);
-            xhttp.send();
-        }
-
-        updateTime();
-        setInterval(updateTime, 1000);
-    </script>
+            updateTime();
+            setInterval(updateTime, 1000);
+        </script>
+    </div>
     <footer class="footer">
         <p>This is early access software running on ESP-IDF v6.</p>
     </footer>

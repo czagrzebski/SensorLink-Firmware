@@ -265,6 +265,6 @@ void broadcast_adc_values(void* pvParameters) {
         httpd_ws_send_frame_to_all_clients(&ws_pkt);
 
         // Wait for 1 second
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(250 / portTICK_PERIOD_MS);
     }
 }

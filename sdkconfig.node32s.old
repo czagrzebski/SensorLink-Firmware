@@ -341,7 +341,7 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 # Wi-Fi Configuration Menu
 #
-CONFIG_AP_SSID="ESP32"
+CONFIG_AP_SSID="SensorLinkUnit"
 CONFIG_AP_PASS="123456789"
 # end of Wi-Fi Configuration Menu
 

@@ -50,11 +50,59 @@ void init_spiffs() {
     esp_vfs_spiffs_register(&config);
 }
 
+esp_err_t init_network() {
+    // Get wifi.txt file from SPIFFS
+    ESP_LOGI(TAG, "Opening wifi.txt file...");
+    FILE* f = fopen("/spiffs/wifi.txt", "r");
+    if(f == NULL) {
+        ESP_LOGE(TAG, "Failed to open wifi.txt file!");
+        return ESP_FAIL;
+    }
+
+    // Read the file contents into a buffer
+    ESP_LOGI(TAG, "Reading wifi.txt file...");
+    char* buffer = malloc(1024);
+    if(buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for wifi.txt buffer!");
+        return ESP_FAIL;
+    }
+    memset(buffer, 0, 1024);
+    fread(buffer, 1, 1024, f);
+    fclose(f);
+
+    // Parse the file contents (SSID and password, each on a new line, separated by equals sign)
+    ESP_LOGI(TAG, "Parsing wifi.txt file...");
+    char* ssid = strtok(buffer, "\n");
+    char* password = strtok(NULL, "\n");
+
+    // Print the parsed values
+    ESP_LOGI(TAG, "SSID: %s", ssid);
+    ESP_LOGI(TAG, "Password: %s", password);
+
+    return ESP_OK;
+}
+
+void setup_io() {
+    // Initialize the ADC with default configuration and calibrate it
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
+
+    // Configure the ADC channel with the default configuration width
+    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
+    
+    // Configure the ADC0 channel with the default configuration attenuation
+    ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_11));
+
+    // Configure the GPIO pin as an input/output pin
+    ESP_ERROR_CHECK(gpio_set_direction(OUTPUT_GPIO_PIN, GPIO_MODE_INPUT_OUTPUT)); 
+}
+
 void app_main() {
     // Initialize the Serial Peripheral Interface Flash File System (SPIFFS)
     init_spiffs();
 
     // Initialize the WiFi Access Point
+    init_network();
+    
     wifi_init_softap();
 
     // Start the web server
@@ -66,16 +114,8 @@ void app_main() {
     }
     ESP_LOGI(TAG, "Web server started successfully!");
 
-    // Initialize the ADC with default configuration and calibrate it
-    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
-
-    // Configure the ADC channel with the default configuration width
-    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
-    
-    // Configure the ADC0 channel with the default configuration attenuation
-    ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_11));
-
-    gpio_set_direction(OUTPUT_GPIO_PIN, GPIO_MODE_INPUT_OUTPUT); 
+    // Setup the GPIO pins
+    setup_io();
 
     // Create a task to broadcast a random value every second
     xTaskCreate(broadcast_adc_values, "broadcast_adc_values", 4096, NULL, 5, NULL);
