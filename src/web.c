@@ -2,6 +2,7 @@
 
 #include "esp_wifi.h"
 #include "esp_mac.h"
+#include "wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "string.h"
@@ -47,6 +48,20 @@ httpd_uri_t uri_version = {
     .handler      = ws_handler,
     .user_ctx     = NULL,
     .is_websocket = true
+};
+
+httpd_uri_t wifi_config_uri = {
+    .uri      = "/wifi-save",
+    .method   = HTTP_POST,
+    .handler  = wifi_config_handler,
+    .user_ctx = NULL
+};
+
+httpd_uri_t wifi_config_html_uri = {
+    .uri      = "/network.html",
+    .method   = HTTP_GET,
+    .handler  = network_page_handler,
+    .user_ctx = NULL
 };
 
 httpd_uri_t chart_js_uri = {
@@ -110,6 +125,67 @@ esp_err_t index_handler(httpd_req_t *req) {
 
     fclose(file);
     httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
+    return ESP_OK;
+}
+
+esp_err_t network_page_handler(httpd_req_t *req) {
+    // Open file from SPIFFS
+    ESP_LOGI(WEB_TAG, "Request received!");
+
+    FILE* file = fopen("/spiffs/network.html", "r");
+    if (file == NULL) {
+        httpd_resp_send_404(req);
+        return ESP_FAIL;
+    }
+
+    // Read the line by line, check for placeholders and replace them
+    char line[1024];
+    while(fgets(line, sizeof(line), file)) {
+        char* newLine = replace_variable(line, "{{GIT_COMMIT_HASH}}", GIT_COMMIT_HASH);
+        httpd_resp_send_chunk(req, newLine, strlen(newLine));
+        free(newLine);
+    }
+
+    fclose(file);
+    httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
+    return ESP_OK;
+}
+
+esp_err_t wifi_config_handler(httpd_req_t *req) {
+    char buf[1024];
+    int ret = httpd_req_recv(req, buf, 1024);
+    if (ret <= 0) {  // 0 if connection closed, < 0 if error
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+
+    // Null-terminate the buffer
+    buf[ret] = '\0';
+
+    // Parse the buffer into key/value pairs
+    char ssid[32];
+    char password[64];
+    ret = httpd_query_key_value(buf, "ssid", ssid, sizeof(ssid));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "password", password, sizeof(password));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    // Save the Wi-Fi credentials to NVS
+    save_wifi_credentials(ssid, password);
+
+    // Send a response
+    httpd_resp_send(req, "OK", 2);
+
+    // Restart the device
+    esp_restart();
     return ESP_OK;
 }
 

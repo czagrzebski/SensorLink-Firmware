@@ -56,7 +56,6 @@ void save_wifi_credentials(char *ssid, char *password) {
     }
 
     nvs_close(nvs_handle);
-    esp_restart();
 }
 
 void init_wifi() {
