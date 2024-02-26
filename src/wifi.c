@@ -4,6 +4,7 @@
 #include "esp_mac.h"
 #include "esp_log.h"
 #include "esp_event.h"
+#include "nvs_flash.h"
 #include "string.h"
 
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
@@ -16,6 +17,61 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
         ESP_LOGI(WIFI_TAG, "station "MACSTR" leave, AID=%d",
                  MAC2STR(event->mac), event->aid);
     }
+}
+
+void init_wifi() {
+    // Check NVS for Wi-Fi Configuration (Username and Password)
+    // If it doesn't exist, start softAP
+    // If it does exist, start station mode
+
+    // Get Wi-Fi Configuration from NVS
+    wifi_mode mode = STA_MODE;
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+    size_t required_size;
+
+    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
+        mode = AP_MODE;
+    } else {
+        ESP_LOGI(WIFI_TAG, "Reading Wi-Fi configuration from NVS");
+    }
+
+    // Failed to get size of ssid, so we can't read it
+    err = nvs_get_str(nvs_handle, "ssid", NULL, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        mode = AP_MODE;
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
+    }
+
+    char* ssid = malloc(required_size);
+    char* password = malloc(required_size);
+    
+    // Read the stored Wi-Fi credentials from NVS
+    err = nvs_get_str(nvs_handle, "ssid", ssid, &required_size);
+    if (err != ESP_OK) {
+        mode = AP_MODE;
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
+    }
+  
+    err = nvs_get_str(nvs_handle, "password", password, &required_size);
+    if (err != ESP_OK) {
+        mode = AP_MODE;
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading password from NVS", esp_err_to_name(err));
+    }
+
+    // If we're in AP mode, start the softAP
+    if (mode == AP_MODE) {
+        wifi_init_softap();
+    } else if (mode == STA_MODE) {
+        //wifi_init_sta(ssid, password);
+    }
+
+    free(ssid);
+    free(password);
+    nvs_close(nvs_handle);
+
 }
 
 void wifi_init_softap(void) {

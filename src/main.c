@@ -50,37 +50,6 @@ void init_spiffs() {
     esp_vfs_spiffs_register(&config);
 }
 
-esp_err_t init_network() {
-    // Get wifi.txt file from SPIFFS
-    ESP_LOGI(TAG, "Opening wifi.txt file...");
-    FILE* f = fopen("/spiffs/wifi.txt", "r");
-    if(f == NULL) {
-        ESP_LOGE(TAG, "Failed to open wifi.txt file!");
-        return ESP_FAIL;
-    }
-
-    // Read the file contents into a buffer
-    ESP_LOGI(TAG, "Reading wifi.txt file...");
-    char* buffer = malloc(1024);
-    if(buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for wifi.txt buffer!");
-        return ESP_FAIL;
-    }
-    memset(buffer, 0, 1024);
-    fread(buffer, 1, 1024, f);
-    fclose(f);
-
-    // Parse the file contents (SSID and password, each on a new line, separated by equals sign)
-    ESP_LOGI(TAG, "Parsing wifi.txt file...");
-    char* ssid = strtok(buffer, "\n");
-    char* password = strtok(NULL, "\n");
-
-    // Print the parsed values
-    ESP_LOGI(TAG, "SSID: %s", ssid);
-    ESP_LOGI(TAG, "Password: %s", password);
-
-    return ESP_OK;
-}
 
 void setup_io() {
     // Initialize the ADC with default configuration and calibrate it
@@ -99,11 +68,9 @@ void setup_io() {
 void app_main() {
     // Initialize the Serial Peripheral Interface Flash File System (SPIFFS)
     init_spiffs();
-
-    // Initialize the WiFi Access Point
-    init_network();
     
-    wifi_init_softap();
+    init_wifi();
+    //wifi_init_softap();
 
     // Start the web server
     ESP_LOGI(TAG, "Starting the web server...");
