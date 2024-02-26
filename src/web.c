@@ -11,14 +11,15 @@
 #include "driver/adc.h"
 
 // Import MIN function
-#ifndef MIN
+/* #ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
-#endif
+#endif */
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
 // Define GIT_COMMIT_HASH if it's not already defined
+// stops the compiler from complaining about undefined variables
 #ifndef GIT_COMMIT_HASH
 #define GIT_COMMIT_HASH "undefined"
 #endif
@@ -121,6 +122,9 @@ esp_err_t chart_js_handler(httpd_req_t *req) {
         httpd_resp_send_404(req);
         return ESP_FAIL;
     }
+
+    // Set header for cache control
+    httpd_resp_set_hdr(req, "Cache-Control", "max-age=3600");
 
     // Read the line by line, check for placeholders and replace them
     char line[1024];
