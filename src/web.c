@@ -58,7 +58,7 @@ httpd_uri_t wifi_config_uri = {
 };
 
 httpd_uri_t wifi_config_html_uri = {
-    .uri      = "/network.html",
+    .uri      = "/network",
     .method   = HTTP_GET,
     .handler  = network_page_handler,
     .user_ctx = NULL
@@ -75,6 +75,13 @@ httpd_uri_t toggle_led_uri = {
     .uri      = "/led",
     .method   = HTTP_GET,
     .handler  = toggle_led_handler,
+    .user_ctx = NULL
+};
+
+httpd_uri_t get_all_networks_uri = {
+    .uri      = "/networks",
+    .method   = HTTP_GET,
+    .handler  = get_all_networks_handler,
     .user_ctx = NULL
 };
 
@@ -153,16 +160,23 @@ esp_err_t network_page_handler(httpd_req_t *req) {
 
 esp_err_t wifi_config_handler(httpd_req_t *req) {
     char buf[1024];
-    int ret = httpd_req_recv(req, buf, 1024);
-    if (ret <= 0) {  // 0 if connection closed, < 0 if error
+
+    /* Truncate if content length larger than the buffer */
+    size_t recv_size = MIN(req->content_len, sizeof(buf));
+
+    int ret = httpd_req_recv(req, buf, recv_size);
+    if (ret <= 0) {  /* 0 return value indicates connection closed */
+        /* Check if timeout occurred */
         if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            /* In case of timeout one can choose to retry calling
+             * httpd_req_recv(), but to keep it simple, here we
+             * respond with an HTTP 408 (Request Timeout) error */
             httpd_resp_send_408(req);
         }
+        /* In case of error, returning ESP_FAIL will
+         * ensure that the underlying socket is closed */
         return ESP_FAIL;
     }
-
-    // Null-terminate the buffer
-    buf[ret] = '\0';
 
     // Parse the buffer into key/value pairs
     char ssid[32];
@@ -184,8 +198,23 @@ esp_err_t wifi_config_handler(httpd_req_t *req) {
     // Send a response
     httpd_resp_send(req, "OK", 2);
 
-    // Restart the device
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+
     esp_restart();
+
+    return ESP_OK;
+}
+
+esp_err_t get_all_networks_handler(httpd_req_t *req) {
+    char** networks = get_wifi_networks();
+    char buf[1024];
+    char* ptr = buf;
+    int len = 0;
+    for (int i = 0; networks[i] != NULL; i++) {
+        len += sprintf(ptr, "%s\n", networks[i]);
+        ptr += len;
+    }
+    httpd_resp_send(req, buf, len);
     return ESP_OK;
 }
 
@@ -252,6 +281,9 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server_handle, &uri_version);
         httpd_register_uri_handler(server_handle, &chart_js_uri);
         httpd_register_uri_handler(server_handle, &toggle_led_uri);
+        httpd_register_uri_handler(server_handle, &wifi_config_uri);
+        httpd_register_uri_handler(server_handle, &wifi_config_html_uri);
+        httpd_register_uri_handler(server_handle, &get_all_networks_uri);
         return server_handle;
     }
 

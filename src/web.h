@@ -20,6 +20,7 @@ esp_err_t toggle_led_handler(httpd_req_t *req);
 esp_err_t chart_js_handler(httpd_req_t *req);
 esp_err_t network_page_handler(httpd_req_t *req);
 esp_err_t wifi_config_handler(httpd_req_t *req);
+esp_err_t get_all_networks_handler(httpd_req_t *req);
 
 // Util Functions
 char* replace_variable(const char* source, const char* placeholder, const char* replacement);
