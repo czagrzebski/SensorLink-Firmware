@@ -235,15 +235,8 @@ esp_err_t wifi_config_handler(httpd_req_t *req) {
 }
 
 esp_err_t get_all_networks_handler(httpd_req_t *req) {
-    char** networks = get_wifi_networks();
-    char buf[1024];
-    char* ptr = buf;
-    int len = 0;
-    for (int i = 0; networks[i] != NULL; i++) {
-        len += sprintf(ptr, "%s\n", networks[i]);
-        ptr += len;
-    }
-    httpd_resp_send(req, buf, len);
+    get_wifi_networks();
+    httpd_resp_send(req, "OK", 2);
     return ESP_OK;
 }
 

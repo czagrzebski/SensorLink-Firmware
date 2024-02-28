@@ -73,20 +73,26 @@ char** get_wifi_networks(void) {
         .show_hidden = true
     };
 
+    // Start the scanning process
     ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-    uint16_t ap_num = 0;
-    esp_wifi_scan_get_ap_num(&ap_num);
-    wifi_ap_record_t *ap_records = (wifi_ap_record_t *)malloc(ap_num * sizeof(wifi_ap_record_t));
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, ap_records));
 
-    char** ssids = (char**)malloc(ap_num * sizeof(char*));
-    for (int i = 0; i < ap_num; i++) {
-        ssids[i] = (char*)malloc(33 * sizeof(char));
-        strcpy(ssids[i], (char*)ap_records[i].ssid);
+    // Get the number of APs found by the scan
+    uint16_t num_ap; 
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&num_ap));
+
+    // Allocate a list of wifi_ap
+    wifi_ap_record_t *ap_records = (wifi_ap_record_t*) malloc(sizeof(wifi_ap_record_t) * num_ap);
+
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&num_ap, ap_records));
+
+    for(int i=0; i < num_ap; i++) {
+        ESP_LOGI(WIFI_TAG, "SSID: %s", ap_records[i].ssid);
     }
 
     free(ap_records);
-    return ssids;
+
+    return NULL;
+    
 }
 
 void wifi_reconnect(void *pvParameters) {

@@ -155,6 +155,7 @@
             <button class="" onclick="openTab('mqttSettings')">MQTT Settings</button>
             <button class="" onclick="openTab('securitySettings')">Security Settings</button>
             <button class="" onclick="openTab('otaSettings')">OTA Settings</button>
+            <button class="" onclick="rebootDevice()">Reboot Link</button>
         </div>
         <div id="sensorMonitor" class="tab">
             <h2 style="text-align: center;">Sensor Control</h2>
@@ -274,8 +275,9 @@
                 </div>
                 <div class="card">
                     <h1>Network Status</h1>
-                    <p>Mode: <span id="wifi-mode">{{MODE}}</span></p>
-                    <p>STA Network: <span id="sta-ssid">{{STA_SSID}}</span></p>
+                    <p>Wi-Fi Mode: <span id="wifi-mode">{{MODE}}</span></p>
+                    <p>STA Network SSID: <span id="sta-ssid">{{STA_SSID}}</span></p>
+                    <p>AP Network SSID: <span id="ap-ssid">{{AP_SSID}}</span></p>
                     <p>AP IP Address: <span id="ip">
                         {{AP_IP}}
                     </span></p>
@@ -467,6 +469,10 @@
                } else {
                    document.getElementById('ap-password').type = 'password';
                }
+            }
+
+            function rebootDevice() {
+                alert('Device is rebooting! Please wait for the device to come back online.');
             }
 
             function renderIPConfig() {
