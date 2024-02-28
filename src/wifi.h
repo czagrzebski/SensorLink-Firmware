@@ -17,5 +17,8 @@ void save_wifi_credentials_to_nvs(char *ssid, char *password);
 void wifi_reconnect(void *pvParameters);
 wifi_mode_t get_wifi_mode(void);
 char** get_wifi_networks(void);
+char* get_mac_addr(void);
+char** get_sta_ap_ip(void);
+char* get_mode(void);
 
 #endif

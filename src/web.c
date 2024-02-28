@@ -122,13 +122,40 @@ esp_err_t index_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
+    char** ip_addresses = get_sta_ap_ip();
+    char* mac_address = get_mac_addr();
+    char* mode = get_mode();
+
     // Read the line by line, check for placeholders and replace them
     char line[1024];
     while(fgets(line, sizeof(line), file)) {
+        char *temp = NULL;
         char* newLine = replace_variable(line, "{{GIT_COMMIT_HASH}}", GIT_COMMIT_HASH);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{MAC_ADDRESS}}", mac_address);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{AP_IP}}", ip_addresses[0]);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_IP}}", ip_addresses[1]);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{MODE}}", mode);
+        free(temp);
+
         httpd_resp_send_chunk(req, newLine, strlen(newLine));
         free(newLine);
     }
+
+    free(mac_address);
+    free(ip_addresses[0]);
+    free(ip_addresses[1]);
+    free(ip_addresses);
 
     fclose(file);
     httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
@@ -290,7 +317,7 @@ httpd_handle_t start_webserver(void) {
     return NULL;
 }
 
-char* replace_variable(const char* source, const char* placeholder, const char* replacement) {
+char* replace_variable(char* source, char* placeholder, char* replacement) {
     const char *p = source;
     int count = 0;
     int placeholderLen = strlen(placeholder);
@@ -318,7 +345,6 @@ char* replace_variable(const char* source, const char* placeholder, const char* 
         }
     }
     *newStr = '\0';
-
     return result;
 }
 
@@ -377,6 +403,6 @@ void broadcast_adc_values(void* pvParameters) {
         httpd_ws_send_frame_to_all_clients(&ws_pkt);
 
         // Wait for 1 second
-        vTaskDelay(250 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }

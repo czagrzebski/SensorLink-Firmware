@@ -23,7 +23,7 @@ esp_err_t wifi_config_handler(httpd_req_t *req);
 esp_err_t get_all_networks_handler(httpd_req_t *req);
 
 // Util Functions
-char* replace_variable(const char* source, const char* placeholder, const char* replacement);
+char* replace_variable(char* source, char* placeholder, char* replacement);
 void broadcast_adc_values(void* pvParameters);
 esp_err_t httpd_ws_send_frame_to_all_clients(httpd_ws_frame_t *ws_pkt);
 httpd_handle_t start_webserver(void);

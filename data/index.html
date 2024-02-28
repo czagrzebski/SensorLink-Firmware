@@ -93,11 +93,39 @@
             text-align: center; /* Center-align the text */
             padding: 10px 0; /* Padding above and below text */
             width: 100%; /* Take the full width of the viewport */
+            position: fixed;
+            left: 0;
+            bottom: 0;
+        }
+
+        .tabNavigation {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .tabNavigation button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #333;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        select {
+            width: 100%;
+        }
+
+        input {
+            width: 100%;
         }
         
-        
     </style>
-    <script src="http://192.168.4.1/chartjs"></script>
+
+    <script src="/chartjs"></script>
 </head>
 <body>
     <div class="content">
@@ -105,7 +133,7 @@
             <h1>SensorLink</h1> <!-- Mention SensorLink in the title -->
             <div id="status-items">
                 <svg style="color: white; margin-right: 5px" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-wifi" viewBox="0 0 16 16"> <path d="M15.384 6.115a.485.485 0 0 0-.047-.736A12.444 12.444 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.518.518 0 0 0 .668.05A11.448 11.448 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049z" fill="white"></path> <path d="M13.229 8.271a.482.482 0 0 0-.063-.745A9.455 9.455 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065zm-2.183 2.183c.226-.226.185-.605-.1-.75A6.473 6.473 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.478 5.478 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091l.016-.015zM9.06 12.44c.196-.196.198-.52-.04-.66A1.99 1.99 0 0 0 8 11.5a1.99 1.99 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z" fill="white"></path> </svg>
-                <span id="ssid">SensorLinkAP</span> <!-- Display SSID here -->
+                <span id="ssidBar">SensorLinkAP</span> <!-- Display SSID here -->
                 <svg style="margin-left: 10px; margin-right: 5px;"xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
                     <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
                     <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
@@ -115,32 +143,146 @@
                 <span id="version">{{GIT_COMMIT_HASH}}</span>
             </div>
         </nav>
-        <div class="card-container">
-            <div class="card">
-                <h1>I/O Device 1</h1>
-                <p>Type: Analog Input</p>
-                <p>Channel: ADC1_CHANNEL_0 </p>
-                <p>Attentuation: 11dB</p>
-                <p>Value: <span id="sensor1">--</span> mV</p>
-                <canvas id="sensor1Graph" width="400" height="300"></canvas>
+
+        <div class="tabNavigation">
+            <button class="" onclick="openTab('sensorMonitor')">Sensor Control</button>
+            <button class="" onclick="openTab('networkSettings')">Network Settings</button>
+            <button class="" onclick="openTab('mqttSettings')">MQTT Settings</button>
+            <button class="" onclick="openTab('securitySettings')">Security Settings</button>
+            <button class="" onclick="openTab('otaSettings')">OTA Settings</button>
+        </div>
+        <div id="sensorMonitor" class="tab">
+            <h2 style="text-align: center;">Sensor Control</h2>
+            <div class="card-container">
+                <div class="card">
+                    <h1>I/O Device 1</h1>
+                    <p>Type: Analog Input</p>
+                    <p>Channel: ADC1_CHANNEL_0 </p>
+                    <p>Attentuation: 11dB</p>
+                    <p>Value: <span id="sensor1">--</span> mV</p>
+                    <canvas id="sensor1Graph" width="400" height="300"></canvas>
+                </div>
+                <div class="card">
+                    <h1>I/O Device 2</h1>
+                    <p>Type: Analog Input</p>
+                    <p>Channel: ADC1_CHANNEL_1 </p>
+                    <p>Attentuation: 0dB</p>
+                    <p>Value: <span id="sensor2">--</span> mV</p>
+                </div>
+                <div class="card">
+                    <h1>I/O Device 3</h1>
+                    <p>Type: Digital Output</p>
+                    <p>Channel: GPIO_NUM_22</p>
+                    <p>State: <span id="led_state">OFF</span></p>
+                    <br>
+                    <button onclick="toggleLEDON()">ON</button>
+                    <button onclick="toggleLEDOFF()">OFF</button>
+                </div>
             </div>
-            <div class="card">
-                <h1>I/O Device 2</h1>
-                <p>Type: Analog Input</p>
-                <p>Channel: ADC1_CHANNEL_1 </p>
-                <p>Attentuation: 0dB</p>
-                <p>Value: <span id="sensor2">--</span> mV</p>
+        </div>
+        <div id="networkSettings" class="tab" style="display: None;">
+            <h2 style="text-align: center;">Network Settings</h2>
+            <div class="card-container">
+                <div class="card">
+                    <h1>Connect to Wi-Fi</h1>
+                    <p>Connect the SensorLink to an existing Wi-Fi Network (station mode).</p>
+                    <form id="wifi-form" onsubmit="return sendConfig(event)">
+                        <label for="network">Discovered Networks</label>
+                        <select name="networks" id="network" size="5" onchange="onChange()" >
+                            <option value="Geek+">Geek+</option>
+                            <option value="Responsive">Responsive</option>
+                            <option value="Hidden Network">Hidden Network</option>
+                            <option value="Outreach">Outreach</option>
+                            <option value="NETGEAR-47">NETGEAR-47</option>
+                        </select>
+                        <p>
+                            <label for="ssid">SSID</label>
+                            <input type="text" id="ssid" name="ssid" required>
+                        </p>
+                        <p>
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" required>
+                        </p>
+                        <p>
+                            <button type="submit">Save Wi-Fi Credentials and Reboot</button>
+                        </p>
+                        
+                    </form>
+                </div>
+                <div class="card">
+                    <h1>Access Point (AP)</h1>
+                    <p>Set the configuration paramters for the AP (broadcasted) network.</p>
+                    <form id="ap-form" onsubmit="return sendConfig(event)">
+                        <p>
+                            <label for="ap-ssid">AP SSID</label>
+                            <input type="text" id="ap-ssid" name="ap-ssid" required>
+                        </p>
+                        <p>
+                            <label for="password">AP Password</label>
+                            <input type="ap-password" id="ap-password" name="ap-password" required>
+                        </p>
+                        <p>
+                            <button type="submit">Save AP Credentials and Reboot</button>
+                        </p>
+                        
+                    </form>
+                </div>
+                <div class="card">
+                    <h1>Network Mode</h1>
+                    <p>Choose whether to use the SensorLink in Access Point (broadcast network) or Station Mode (connect to an existing network).</p>
+                    <p>When the device is in station mode but the network is unavailable, the Access Point will automatically start.</p>
+                    <select>
+                        <option value="station">Station Mode with Access Point Backup</option>
+                        <option value="ap">Access Point Mode</option>
+                    </select>
+                </div>
+                <div class="card">
+                    <h1>Network Status</h1>
+                    <p>Mode: <span id="wifi-mode">{{MODE}}</span></p>
+                    <p>AP IP Address: <span id="ip">
+                        {{AP_IP}}
+                    </span></p>
+                    <p>Station IP Address: <span id="ip">
+                        {{STA_IP}}
+                    </span></p>
+                    <p>MAC Address: <span id="mac">
+                        {{MAC_ADDRESS}}
+                    </span></p>
+                </div>
             </div>
-            <div class="card">
-                <h1>I/O Device 3</h1>
-                <p>Type: Digital Output</p>
-                <p>Channel: GPIO_NUM_22</p>
-                <p>State: <span id="led_state">OFF</span></p>
-                <br>
-                <button onclick="toggleLEDON()">ON</button>
-                <button onclick="toggleLEDOFF()">OFF</button>
+        </div>
+        <div id="mqttSettings" class="tab" style="display: None;">
+            <h2 style="text-align: center;">MQTT Settings</h2>
+            <div class="card-container">
+                <div class="card">
+                    <h1>MQTT Broker</h1>
+                    <p>Set the configuration parameters for the MQTT Broker.</p>
+                    <form id="ap-forms" onsubmit="return sendConfig(event)">
+                        <p>
+                            <label for="ap-ssid">Broker Address</label>
+                            <input type="text" id="ap-ssid" name="ap-ssid" required>
+                        </p>
+                        <p>
+                            <label for="password">Broker Username</label>
+                            <input type="ap-password" id="ap-password" name="ap-password" required>
+                        </p>
+                        <p>
+                            <label for="password">Broker Password</label>
+                            <input type="ap-password" id="ap-password" name="ap-password" required>
+                        </p>
+                        <p>
+                            <button type="submit">Save MQTT Parameters and Reboot</button>
+                        </p>
+                        
+                    </form>
+                </div>
             </div>
-            <!-- Add more cards for different sensors -->
+        </div>
+        <div id="securitySettings" class="tab" style="display: None;">
+            <h2 style="text-align: center;">Security Settings</h2>
+        </div>
+        <div id="otaSettings" class="tab" style="display: None;">
+            <h2 style="text-align: center;">Over-the-Air Update Settings</h2>
         </div>
         <script>
             // Function to add new data to the graph
@@ -205,8 +347,17 @@
                     }
                 }
             });
-                    // Establish a connection with the WebSocket server
-            const ws = new WebSocket('ws://192.168.4.1/ws'); 
+
+            var loc = window.location, new_uri;
+            if (loc.protocol === "https:") {
+                new_uri = "wss:";
+            } else {
+                new_uri = "ws:";
+            }
+            new_uri += "//" + loc.host;
+            new_uri += loc.pathname + "ws";
+            
+            const ws = new WebSocket(new_uri); 
 
             // Event listener to be called when the WebSocket connection is opened
             ws.onopen = function() {
@@ -271,6 +422,55 @@
                 var xhttp = new XMLHttpRequest();
                 xhttp.open("GET", "/led?pin=22&state=1", true);
                 xhttp.send();
+            }
+
+            function openTab(tabName) {
+                var i;
+                var x = document.getElementsByClassName("tab");
+                console.log(x)
+                for (i = 0; i < x.length; i++) {
+                  x[i].style.display = "none";  
+                }
+                document.getElementById(tabName).style.display = "block";  
+              }
+
+              function sendConfig(e) {
+                const form = document.getElementById('wifi-form')
+                const ssid = form.ssid.value;
+                const password = form.password.value;
+                e.preventDefault();
+                
+                const data = 'ssid=' + encodeURIComponent(ssid) + '&password=' + encodeURIComponent(password);
+                // Store them as query parameters not as JSON
+                fetch(`/wifi-save`, {
+                    method: 'POST',
+                    body: data,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            alert('Failed to save Wi-Fi credentials');
+                        } else {
+                            console.log(response);
+                            alert('Wi-Fi credentials saved successfully. The device will reboot to apply the changes.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error(error);
+                        alert('Failed to save Wi-Fi credentials');
+                    });
+    
+                    return false;
+            }
+    
+    
+            function onChange() {
+                console.log('onChange');
+                console.log(document.getElementById('network').value);
+                console.log(document.getElementById('ssid'));
+                document.getElementById('ssid').value = document.getElementById('network').value;
             }
 
             updateTime();

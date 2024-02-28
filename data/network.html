@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SensorLink</title>
+    <title>SensorLink Client</title>
   
     <style>
         body {
@@ -108,7 +108,7 @@
             <h1>SensorLink</h1> <!-- Mention SensorLink in the title -->
             <div id="status-items">
                 <svg style="color: white; margin-right: 5px" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-wifi" viewBox="0 0 16 16"> <path d="M15.384 6.115a.485.485 0 0 0-.047-.736A12.444 12.444 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.518.518 0 0 0 .668.05A11.448 11.448 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049z" fill="white"></path> <path d="M13.229 8.271a.482.482 0 0 0-.063-.745A9.455 9.455 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065zm-2.183 2.183c.226-.226.185-.605-.1-.75A6.473 6.473 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.478 5.478 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091l.016-.015zM9.06 12.44c.196-.196.198-.52-.04-.66A1.99 1.99 0 0 0 8 11.5a1.99 1.99 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z" fill="white"></path> </svg>
-                <span id="ssid">SensorLinkAP</span> <!-- Display SSID here -->
+                <span id="ssidcur">SensorLinkAP</span> <!-- Display SSID here -->
                 <svg style="margin-left: 10px; margin-right: 5px;"xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
                     <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
                     <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
@@ -118,22 +118,19 @@
                 <span id="version">{{GIT_COMMIT_HASH}}</span>
             </div>
         </nav>
-        <h3 style="text-align: center;">Wi-Fi Network Manager</h3>
+        <h3 style="text-align: center;">SensorLink Client Configuration</h3>
         <!-- Form for Network SSID and Password -->
         <div class="card-container">
             <div class="card">
                 <h1>Connect to Wi-Fi</h1>
                 <form id="wifi-form" onsubmit="return sendConfig(event)">
                     <label for="network">Discovered Networks</label>
-                    <select name="networks" id="network" size="5">
-                        <option value="javascript">Geek+</option>
-                        <option value="php">PHP</option>
-                        <option value="java">Java</option>
-                        <option value="golang">Golang</option>
-                        <option value="python">Python</option>
-                        <option value="c#">C#</option>
-                        <option value="C++">C++</option>
-                        <option value="erlang">Erlang</option>
+                    <select name="networks" id="network" size="5" onchange="onChange()" >
+                        <option value="Geek+">Geek+</option>
+                        <option value="Responsive">Responsive</option>
+                        <option value="Hidden Network">Hidden Network</option>
+                        <option value="Outreach">Outreach</option>
+                        <option value="NETGEAR-47">NETGEAR-47</option>
                     </select>
                     <p>
                         <label for="ssid">SSID</label>
@@ -154,8 +151,18 @@
                 <p>The device will only be accessible via the Access Point when Wi-Fi credentials are not provided or the station network is unavailable.</p>
                 <p>To permanently switch to Access Point mode, remove the Wi-Fi credentials and reboot the device.</p>
                 <button type="submit">Remove Wi-Fi Credentials and Reboot</button>
-                </div>
-                </div>
+            </div>
+            <div class="card">
+                <h1>Network Status</h1>
+                <p>Mode: <span id="wifi_mode">{{WIFI_MODE}}</span></p>
+                <p>IP Address: <span id="ip">
+                    {{STA_IP}}
+                </span></p>
+                <p>MAC Address: <span id="mac">
+                    {{MAC_ADDRESS}}
+                </span></p>
+            </div>
+        </div>
     </div>
     <footer class="footer">
         <p>Warning! This is an early development build. Some features may not work as expected.</p>
@@ -184,8 +191,12 @@
                 }
             })
                 .then(response => {
-                    console.log(response);
-                    alert('Wi-Fi credentials saved successfully. The device will reboot to apply the changes.');
+                    if (!response.ok) {
+                        alert('Failed to save Wi-Fi credentials');
+                    } else {
+                        console.log(response);
+                        alert('Wi-Fi credentials saved successfully. The device will reboot to apply the changes.');
+                    }
                 })
                 .catch(error => {
                     console.error(error);
@@ -193,6 +204,14 @@
                 });
 
                 return false;
+        }
+
+
+        function onChange() {
+            console.log('onChange');
+            console.log(document.getElementById('network').value);
+            console.log(document.getElementById('ssid'));
+            document.getElementById('ssid').value = document.getElementById('network').value;
         }
 
         updateTime();

@@ -7,6 +7,10 @@
 #include "nvs_flash.h"
 #include "string.h"
 
+// Interfaces
+esp_netif_t *sta_netif;
+esp_netif_t *ap_netif;
+
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
@@ -29,6 +33,33 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
             // Start the AP Mode since we're disconnected from the Station Network
             wifi_init_softap();
         }
+    }
+}
+
+char** get_sta_ap_ip(void) {
+    char** ip = (char**)malloc(2 * sizeof(char*));
+    ip[0] = (char*)malloc(16 * sizeof(char));
+    ip[1] = (char*)malloc(16 * sizeof(char));
+
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(sta_netif, &ip_info);
+    esp_ip4addr_ntoa(&ip_info.ip, ip[0], 16);
+    esp_netif_get_ip_info(ap_netif, &ip_info);
+    esp_ip4addr_ntoa(&ip_info.ip, ip[1], 16);
+    return ip;
+}
+
+char* get_mode(void) {
+    wifi_mode_t mode;
+    esp_wifi_get_mode(&mode);
+    if (mode == WIFI_MODE_STA) {
+        return "Station";
+    } else if (mode == WIFI_MODE_AP) {
+        return "Access Point";
+    } else if (mode == WIFI_MODE_APSTA) {
+        return "Station and Access Point";
+    } else {
+        return "Unknown";
     }
 }
 
@@ -170,8 +201,8 @@ void init_wifi() {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-    esp_netif_create_default_wifi_ap();
-    esp_netif_create_default_wifi_sta();
+    sta_netif = esp_netif_create_default_wifi_ap();
+    ap_netif = esp_netif_create_default_wifi_sta();
     
     // Allocate resources for the default WiFi driver. Initiates a task for the WiFi driver
     wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
@@ -188,8 +219,16 @@ void init_wifi() {
     free(passphrase);
 }
 
-void wifi_init_sta(char* ssid, char* password) {
+char* get_mac_addr(void) {
+    char* mac_addr_str = (char*)malloc(18 * sizeof(char));
+    uint8_t mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    sprintf(mac_addr_str, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    return mac_addr_str;
 
+}
+
+void wifi_init_sta(char* ssid, char* password) {
     ESP_LOGI(WIFI_TAG, "Initializing Station Mode...");
 
     // Wifi config with auto connect

@@ -63,6 +63,7 @@ void setup_io() {
 
     // Configure the GPIO pin as an input/output pin
     ESP_ERROR_CHECK(gpio_set_direction(OUTPUT_GPIO_PIN, GPIO_MODE_INPUT_OUTPUT)); 
+   
 }
 
 void app_main() {
