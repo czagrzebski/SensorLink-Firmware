@@ -243,8 +243,8 @@ void wifi_init_sta(char* ssid, char* password) {
     };
 
     // Set the SSID and Password for the Station
-    strcpy((char*)wifi_sta_config.sta.ssid, "Internet3");
-    strcpy((char*)wifi_sta_config.sta.password, "7154988714");
+    strcpy((char*)wifi_sta_config.sta.ssid, ssid);
+    strcpy((char*)wifi_sta_config.sta.password, password);
 
     ESP_LOGI(WIFI_TAG, "Setting WiFi Station configuration SSID");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));

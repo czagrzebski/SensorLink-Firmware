@@ -156,6 +156,7 @@ esp_err_t index_handler(httpd_req_t *req) {
     free(ip_addresses[0]);
     free(ip_addresses[1]);
     free(ip_addresses);
+    free(mode);
 
     fclose(file);
     httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
