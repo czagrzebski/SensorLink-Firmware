@@ -122,10 +122,15 @@
         input {
             width: 100%;
         }
+
+        input[type="checkbox"] {
+            width: 10px;
+        }
         
     </style>
 
-    <script src="/chartjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!--  <script src="/chartjs"></script> -->
 </head>
 <body>
     <div class="content">
@@ -133,7 +138,7 @@
             <h1>SensorLink</h1> <!-- Mention SensorLink in the title -->
             <div id="status-items">
                 <svg style="color: white; margin-right: 5px" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-wifi" viewBox="0 0 16 16"> <path d="M15.384 6.115a.485.485 0 0 0-.047-.736A12.444 12.444 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.518.518 0 0 0 .668.05A11.448 11.448 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049z" fill="white"></path> <path d="M13.229 8.271a.482.482 0 0 0-.063-.745A9.455 9.455 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065zm-2.183 2.183c.226-.226.185-.605-.1-.75A6.473 6.473 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.478 5.478 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091l.016-.015zM9.06 12.44c.196-.196.198-.52-.04-.66A1.99 1.99 0 0 0 8 11.5a1.99 1.99 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z" fill="white"></path> </svg>
-                <span id="ssidBar">SensorLinkAP</span> <!-- Display SSID here -->
+                <span id="ssidBar">{{STA_SSID}}</span> <!-- Display SSID here -->
                 <svg style="margin-left: 10px; margin-right: 5px;"xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
                     <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
                     <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
@@ -184,7 +189,7 @@
             <h2 style="text-align: center;">Network Settings</h2>
             <div class="card-container">
                 <div class="card">
-                    <h1>Connect to Wi-Fi</h1>
+                    <h1>Connect to Wi-Fi (Station)</h1>
                     <p>Connect the SensorLink to an existing Wi-Fi Network (station mode).</p>
                     <form id="wifi-form" onsubmit="return sendConfig(event)">
                         <label for="network">Discovered Networks</label>
@@ -210,6 +215,33 @@
                     </form>
                 </div>
                 <div class="card">
+                    <h1>DHCP/IPv4 Configuration</h1>
+                    <p>Select a IPv4 Method.</p>
+                    <form id="ipv4-configuration" onsubmit="return sendConfig(event)">
+                        <label for="ipv4-method">IPv4 Method</label>
+                        <select name="ipv4-method" id="ipv4-method" onchange="renderIPConfig()">
+                            <option value="DHCP" selected>DHCP</option>
+                            <option value="Static">Manual</option>
+                        </select>
+                        <p>
+                            <label id="ipv4-static-addr-lbl" for="ipv4-static-addr">Address</label>
+                            <input type="text" id="ipv4-static-addr" name="ipv4-static-addr" required>
+                        </p>
+                        <p>
+                            <label id="ipv4-static-netmask-lbl" for="ipv4-static-netmask">Netmask</label>
+                            <input type="text" id="ipv4-static-netmask" name="ipv4-static-netmask" required>
+                        </p>
+                        <p>
+                            <label id="ipv4-static-gateway-lbl" for="ipv4-static-gateway">Gateway</label>
+                            <input type="text" id="ipv4-static-gateway" name="ipv4-static-gateway" required>
+                        </p>
+                        <p>
+                            <button type="submit">Save IPv4 Configuration and Reboot</button>
+                        </p>
+                        
+                    </form>
+                </div>
+                <div class="card">
                     <h1>Access Point (AP)</h1>
                     <p>Set the configuration paramters for the AP (broadcasted) network.</p>
                     <form id="ap-form" onsubmit="return sendConfig(event)">
@@ -219,7 +251,11 @@
                         </p>
                         <p>
                             <label for="password">AP Password</label>
-                            <input type="ap-password" id="ap-password" name="ap-password" required>
+                            <input type="password" id="ap-password" name="ap-password" required>
+                        </p>
+                        <p>
+                            <p>Show Password: <input type="checkbox" id="show-password" name="show-password" onchange="showPassword()"></p>
+                            
                         </p>
                         <p>
                             <button type="submit">Save AP Credentials and Reboot</button>
@@ -233,12 +269,13 @@
                     <p>When the device is in station mode but the network is unavailable, the Access Point will automatically start.</p>
                     <select>
                         <option value="station">Station Mode with Access Point Backup</option>
-                        <option value="ap">Access Point Mode</option>
+                        <option value="ap">Access Point Mode Only</option>
                     </select>
                 </div>
                 <div class="card">
                     <h1>Network Status</h1>
                     <p>Mode: <span id="wifi-mode">{{MODE}}</span></p>
+                    <p>STA Network: <span id="sta-ssid">{{STA_SSID}}</span></p>
                     <p>AP IP Address: <span id="ip">
                         {{AP_IP}}
                     </span></p>
@@ -424,6 +461,36 @@
                 xhttp.send();
             }
 
+            function showPassword(e) {
+               if (document.getElementById('show-password').checked) {
+                   document.getElementById('ap-password').type = 'text';
+               } else {
+                   document.getElementById('ap-password').type = 'password';
+               }
+            }
+
+            function renderIPConfig() {
+                const method = document.getElementById('ipv4-method').value;
+                console.log(method);
+                console.log("Rendering")
+                if (method === 'DHCP') {
+                    document.getElementById('ipv4-static-addr').style.display = 'none';
+                    document.getElementById('ipv4-static-netmask').style.display = 'none';
+                    document.getElementById('ipv4-static-gateway').style.display = 'none';
+                    document.getElementById('ipv4-static-addr-lbl').style.display = 'none';
+                    document.getElementById('ipv4-static-netmask-lbl').style.display = 'none';
+                    document.getElementById('ipv4-static-gateway-lbl').style.display = 'none';
+
+                } else if(method === 'Static') {
+                    document.getElementById('ipv4-static-addr').style.display = 'block';
+                    document.getElementById('ipv4-static-netmask').style.display = 'block';
+                    document.getElementById('ipv4-static-gateway').style.display = 'block';
+                    document.getElementById('ipv4-static-addr-lbl').style.display = 'block';
+                    document.getElementById('ipv4-static-netmask-lbl').style.display = 'block';
+                    document.getElementById('ipv4-static-gateway-lbl').style.display = 'block';
+                }
+            }
+
             function openTab(tabName) {
                 var i;
                 var x = document.getElementsByClassName("tab");
@@ -473,6 +540,7 @@
                 document.getElementById('ssid').value = document.getElementById('network').value;
             }
 
+            renderIPConfig();
             updateTime();
             setInterval(updateTime, 1000);
         </script>

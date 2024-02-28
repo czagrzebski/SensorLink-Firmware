@@ -228,6 +228,7 @@ esp_err_t wifi_config_handler(httpd_req_t *req) {
 
     vTaskDelay(3000 / portTICK_PERIOD_MS);
 
+    // Restart the ESP32 to connect to the new network
     esp_restart();
 
     return ESP_OK;
