@@ -78,12 +78,21 @@ httpd_uri_t toggle_led_uri = {
     .user_ctx = NULL
 };
 
+httpd_uri_t restart_esp_uri = {
+    .uri      = "/restart",
+    .method   = HTTP_GET,
+    .handler  = restart_esp_handler,
+    .user_ctx = NULL
+};
+
 httpd_uri_t get_all_networks_uri = {
     .uri      = "/networks",
     .method   = HTTP_GET,
     .handler  = get_all_networks_handler,
     .user_ctx = NULL
 };
+
+
 
 // Web server handle
 esp_err_t httpd_ws_send_frame_to_all_clients(httpd_ws_frame_t *ws_pkt) {
@@ -152,11 +161,11 @@ esp_err_t index_handler(httpd_req_t *req) {
         free(newLine);
     }
 
-    free(mac_address);
+    //free(mac_address);
     free(ip_addresses[0]);
     free(ip_addresses[1]);
     free(ip_addresses);
-    free(mode);
+    //free(mode);
 
     fclose(file);
     httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
@@ -189,6 +198,9 @@ esp_err_t network_page_handler(httpd_req_t *req) {
 esp_err_t wifi_config_handler(httpd_req_t *req) {
     char buf[1024];
 
+    // Clear the buffer
+    memset(buf, 0, sizeof(buf));
+
     /* Truncate if content length larger than the buffer */
     size_t recv_size = MIN(req->content_len, sizeof(buf));
 
@@ -220,23 +232,55 @@ esp_err_t wifi_config_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
+    ESP_LOGI(WEB_TAG, "Received Credentials. SSID: %s, Password: %s", ssid, password);
+
     // Save the Wi-Fi credentials to NVS
     save_wifi_credentials_to_nvs(ssid, password);
 
     // Send a response
     httpd_resp_send(req, "OK", 2);
 
+    return ESP_OK;
+}
+
+esp_err_t restart_esp_handler(httpd_req_t *req) {
+
+    // Send a response
+    httpd_resp_send(req, "OK", 2);
+
     vTaskDelay(3000 / portTICK_PERIOD_MS);
 
-    // Restart the ESP32 to connect to the new network
+    // Restart the ESP
     esp_restart();
-
     return ESP_OK;
 }
 
 esp_err_t get_all_networks_handler(httpd_req_t *req) {
-    get_wifi_networks();
-    httpd_resp_send(req, "OK", 2);
+    ssid_list_t* ssid_list = get_wifi_networks();
+
+    // Send the list of networks as a JSON array
+    httpd_resp_set_type(req, "application/json");
+    // build entire json string first
+    char* json = (char*)malloc(1024);
+    strcpy(json, "[");
+    for(int i = 0; i < ssid_list->size; i++) {
+        strcat(json, "\"");
+        strcat(json, ssid_list->ssid_list[i]);
+        strcat(json, "\"");
+        if (i < ssid_list->size - 1) {
+            strcat(json, ",");
+        }
+    }
+    strcat(json, "]");
+    httpd_resp_send(req, json, strlen(json));
+    free(json);
+    // free each ssid
+    for(int i = 0; i < ssid_list->size; i++) {
+        free(ssid_list->ssid_list[i]);
+    }
+    // free the list
+    free(ssid_list->ssid_list);
+    free(ssid_list);
     return ESP_OK;
 }
 
@@ -295,6 +339,8 @@ esp_err_t ws_handler(httpd_req_t *req) {
 // Start the web server
 httpd_handle_t start_webserver(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+    config.max_uri_handlers = 16;
     
     if(httpd_start(&server_handle, &config) == ESP_OK) {
         // Register URI handlers
@@ -305,6 +351,7 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server_handle, &toggle_led_uri);
         httpd_register_uri_handler(server_handle, &wifi_config_uri);
         httpd_register_uri_handler(server_handle, &wifi_config_html_uri);
+        httpd_register_uri_handler(server_handle, &restart_esp_uri);
         httpd_register_uri_handler(server_handle, &get_all_networks_uri);
         return server_handle;
     }

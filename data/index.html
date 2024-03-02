@@ -129,8 +129,7 @@
         
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!--  <script src="/chartjs"></script> -->
+    <script src="/chartjs"></script>
 </head>
 <body>
     <div class="content">
@@ -193,14 +192,10 @@
                     <h1>Connect to Wi-Fi (Station)</h1>
                     <p>Connect the SensorLink to an existing Wi-Fi Network (station mode).</p>
                     <form id="wifi-form" onsubmit="return sendConfig(event)">
-                        <label for="network">Discovered Networks</label>
-                        <select name="networks" id="network" size="5" onchange="onChange()" >
-                            <option value="Geek+">Geek+</option>
-                            <option value="Responsive">Responsive</option>
-                            <option value="Hidden Network">Hidden Network</option>
-                            <option value="Outreach">Outreach</option>
-                            <option value="NETGEAR-47">NETGEAR-47</option>
+                        <label for="networks">Discovered Networks</label>
+                        <select name="networks" id="networks" size="5" onchange="onChange()" >
                         </select>
+                        <button type="button" onclick="fetchNetworks()">Refresh List</button>
                         <p>
                             <label for="ssid">SSID</label>
                             <input type="text" id="ssid" name="ssid" required>
@@ -471,8 +466,39 @@
                }
             }
 
+            function fetchNetworks() {
+                const networkList = document.getElementById('networks');
+                networkList.innerHTML = '';
+
+                fetch('/networks', {
+                    method: 'GET'
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            alert('Failed to fetch networks');
+                        } else {
+                            response.json().then(data => {
+                                console.log(data)
+                                data.forEach(network => {
+                                    const option = document.createElement('option');
+                                    option.value = network;
+                                    option.textContent = network;
+                                    networkList.appendChild(option);
+                                });
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error(error);
+                        alert('Failed to fetch networks');
+                    });
+
+                alert('Fetching Networks. Please wait.')
+            }
+
             function rebootDevice() {
                 alert('Device is rebooting! Please wait for the device to come back online.');
+                fetch('/restart', {method: 'GET'});   
             }
 
             function renderIPConfig() {
@@ -513,7 +539,7 @@
                 const password = form.password.value;
                 e.preventDefault();
                 
-                const data = 'ssid=' + encodeURIComponent(ssid) + '&password=' + encodeURIComponent(password);
+                const data = 'ssid=' + encodeURIComponent(ssid) + '&password=' + password;
                 // Store them as query parameters not as JSON
                 fetch(`/wifi-save`, {
                     method: 'POST',
@@ -541,9 +567,9 @@
     
             function onChange() {
                 console.log('onChange');
-                console.log(document.getElementById('network').value);
+                console.log(document.getElementById('networks').value);
                 console.log(document.getElementById('ssid'));
-                document.getElementById('ssid').value = document.getElementById('network').value;
+                document.getElementById('ssid').value = document.getElementById('networks').value;
             }
 
             renderIPConfig();

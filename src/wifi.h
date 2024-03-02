@@ -8,6 +8,11 @@
 #define AP_PASSPHRASE CONFIG_AP_PASS
 #define WIFI_TAG "wifi"
 
+typedef struct {
+    char** ssid_list; 
+    int size;
+} ssid_list_t;
+
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 void wifi_init_sta(char* ssid, char* password);
 void wifi_init_softap(void);
@@ -16,9 +21,11 @@ void stop_wifi_ap(void);
 void save_wifi_credentials_to_nvs(char *ssid, char *password);
 void wifi_reconnect(void *pvParameters);
 wifi_mode_t get_wifi_mode(void);
-char** get_wifi_networks(void);
+ssid_list_t* get_wifi_networks(void);
 char* get_mac_addr(void);
 char** get_sta_ap_ip(void);
 char* get_mode(void);
+
+
 
 #endif

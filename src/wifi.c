@@ -64,15 +64,15 @@ char* get_mode(void) {
 }
 
 // Function to get all the Wi-Fi networks in the area. Return a char* array of SSIDs
-char** get_wifi_networks(void) {
+ssid_list_t* get_wifi_networks(void) {
     // Get the Wi-Fi networks in the area
     wifi_scan_config_t scan_config = {
         .ssid = 0,
         .bssid = 0,
         .channel = 0,
-        .show_hidden = true
+        .show_hidden = false
     };
-
+    
     // Start the scanning process
     ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
 
@@ -85,19 +85,24 @@ char** get_wifi_networks(void) {
 
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&num_ap, ap_records));
 
+    char** ssid_names = malloc(sizeof(char*) * num_ap);
+
     for(int i=0; i < num_ap; i++) {
         ESP_LOGI(WIFI_TAG, "SSID: %s", ap_records[i].ssid);
+        ssid_names[i] = (char*)malloc(33 * sizeof(char)); 
+        strcpy(ssid_names[i], (char*)ap_records[i].ssid);
     }
 
+    ssid_list_t* ssid_list = (ssid_list_t*) malloc(sizeof(ssid_list_t));
+    ssid_list->size = num_ap;
+    ssid_list->ssid_list = ssid_names;
     free(ap_records);
-
-    return NULL;
-    
+    return ssid_list;
 }
 
 void wifi_reconnect(void *pvParameters) {
     ESP_LOGI(WIFI_TAG, "Reconnecting to Station Network...");
-    vTaskDelay(pdMS_TO_TICKS(10000)); 
+    vTaskDelay(pdMS_TO_TICKS(1200000)); 
     esp_wifi_connect();
     vTaskDelete(NULL); 
 }
@@ -161,6 +166,7 @@ esp_err_t fetch_credentials_from_nvs(char *ssid, char* passphrase) {
 
     // Allocate memory for the SSID
     ssid = malloc(required_size);
+    memset(ssid, 0, required_size);
 
     // Read the stored Wi-Fi credentials from NVS
     err = nvs_get_str(nvs_handle, "ssid", ssid, &required_size);
@@ -175,6 +181,7 @@ esp_err_t fetch_credentials_from_nvs(char *ssid, char* passphrase) {
     }
 
     passphrase = malloc(required_size);
+    memset(passphrase, 0, required_size);
 
     err = nvs_get_str(nvs_handle, "password", passphrase, &required_size);
     if (err != ESP_OK) {
@@ -183,7 +190,7 @@ esp_err_t fetch_credentials_from_nvs(char *ssid, char* passphrase) {
 
     nvs_close(nvs_handle);
  
-    ESP_LOGI(WIFI_TAG, "%s %s", ssid, passphrase);
+    ESP_LOGI(WIFI_TAG, "%s %s", passphrase, ssid);
 
     return ESP_OK;
 }
@@ -193,6 +200,9 @@ void init_wifi() {
     wifi_mode_t mode;
     char* ssid = NULL;
     char* passphrase = NULL;
+
+    ssid = (char*)malloc(33 * sizeof(char));
+    passphrase = (char*)malloc(64 * sizeof(char));
 
     if(fetch_credentials_from_nvs(ssid, passphrase) == ESP_OK) {
         ESP_LOGI(WIFI_TAG, "Retrieved Wi-Fi Configuration from NVS");
