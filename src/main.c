@@ -66,6 +66,7 @@ void setup_io() {
    
 }
 
+// Main application entry point
 void app_main() {
     // Initialize the Serial Peripheral Interface Flash File System (SPIFFS)
     init_spiffs();
@@ -85,7 +86,7 @@ void app_main() {
     // Setup the GPIO pins
     setup_io();
 
-    // Create a task to broadcast a random value every second
+    // Create a task to broadcast a random value every second 
     xTaskCreate(broadcast_adc_values, "broadcast_adc_values", 4096, NULL, 5, NULL);
 
     // Wait for the web server to be stopped
@@ -96,5 +97,4 @@ void app_main() {
     // Unmount the SPIFFS
     ESP_LOGI(TAG, "Unmounting the SPIFFS...");
     esp_vfs_spiffs_unregister(NULL);
-
 }

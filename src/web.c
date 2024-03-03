@@ -20,7 +20,7 @@
 #include "lwip/sys.h"
 
 // Define GIT_COMMIT_HASH if it's not already defined
-// stops GCC from whining about an undefined macro 
+// stops GCC from whining about an undefined macro
 #ifndef GIT_COMMIT_HASH
 #define GIT_COMMIT_HASH "undefined"
 #endif
@@ -51,9 +51,16 @@ httpd_uri_t uri_version = {
 };
 
 httpd_uri_t wifi_config_uri = {
-    .uri      = "/wifi-save",
+    .uri      = "/wifi-save-creds",
     .method   = HTTP_POST,
-    .handler  = wifi_config_handler,
+    .handler  = wifi_credential_handler,
+    .user_ctx = NULL
+};
+
+httpd_uri_t wifi_ap_config_uri = {
+    .uri      = "/wifi-save-ap-creds",
+    .method   = HTTP_POST,
+    .handler  = wifi_ap_credential_handler,
     .user_ctx = NULL
 };
 
@@ -92,8 +99,6 @@ httpd_uri_t get_all_networks_uri = {
     .user_ctx = NULL
 };
 
-
-
 // Web server handle
 esp_err_t httpd_ws_send_frame_to_all_clients(httpd_ws_frame_t *ws_pkt) {
     size_t max_clients = CONFIG_LWIP_MAX_LISTENING_TCP;
@@ -131,9 +136,7 @@ esp_err_t index_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
-    char** ip_addresses = get_sta_ap_ip();
-    char* mac_address = get_mac_addr();
-    char* mode = get_mode();
+    network_info_t* net_info = get_network_info();
 
     // Read the line by line, check for placeholders and replace them
     char line[1024];
@@ -142,19 +145,31 @@ esp_err_t index_handler(httpd_req_t *req) {
         char* newLine = replace_variable(line, "{{GIT_COMMIT_HASH}}", GIT_COMMIT_HASH);
 
         temp = newLine;
-        newLine = replace_variable(newLine, "{{MAC_ADDRESS}}", mac_address);
+        newLine = replace_variable(newLine, "{{MAC_ADDRESS}}", net_info->mac_address);
         free(temp);
 
         temp = newLine;
-        newLine = replace_variable(newLine, "{{AP_IP}}", ip_addresses[0]);
+        newLine = replace_variable(newLine, "{{AP_IP}}", net_info->ap_ip);
         free(temp);
 
         temp = newLine;
-        newLine = replace_variable(newLine, "{{STA_IP}}", ip_addresses[1]);
+        newLine = replace_variable(newLine,"{{STA_SSID}}", net_info->station_ssid);
         free(temp);
 
         temp = newLine;
-        newLine = replace_variable(newLine, "{{MODE}}", mode);
+        newLine = replace_variable(newLine, "{{AP_SSID}}", net_info->ap_ssid);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{AP_PASSKEY}}", net_info->ap_passkey);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_IP}}", net_info->station_ip);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{MODE}}", net_info->mode);
         free(temp);
 
         httpd_resp_send_chunk(req, newLine, strlen(newLine));
@@ -162,10 +177,13 @@ esp_err_t index_handler(httpd_req_t *req) {
     }
 
     //free(mac_address);
-    free(ip_addresses[0]);
-    free(ip_addresses[1]);
-    free(ip_addresses);
-    //free(mode);
+    free(net_info->ap_ip);
+    free(net_info->station_ip);
+    free(net_info->station_ssid);
+    free(net_info->ap_ssid);
+    free(net_info->mac_address);
+    free(net_info->ap_passkey);
+    free(net_info);
 
     fclose(file);
     httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
@@ -195,7 +213,7 @@ esp_err_t network_page_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-esp_err_t wifi_config_handler(httpd_req_t *req) {
+esp_err_t wifi_credential_handler(httpd_req_t *req) {
     char buf[1024];
 
     // Clear the buffer
@@ -236,6 +254,54 @@ esp_err_t wifi_config_handler(httpd_req_t *req) {
 
     // Save the Wi-Fi credentials to NVS
     save_wifi_credentials_to_nvs(ssid, password);
+
+    // Send a response
+    httpd_resp_send(req, "OK", 2);
+
+    return ESP_OK;
+}
+
+esp_err_t wifi_ap_credential_handler(httpd_req_t *req) {
+    char buf[1024];
+
+    // Clear the buffer
+    memset(buf, 0, sizeof(buf));
+
+    /* Truncate if content length larger than the buffer */
+    size_t recv_size = MIN(req->content_len, sizeof(buf));
+
+    int ret = httpd_req_recv(req, buf, recv_size);
+    if (ret <= 0) {  /* 0 return value indicates connection closed */
+        /* Check if timeout occurred */
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            /* In case of timeout one can choose to retry calling
+             * httpd_req_recv(), but to keep it simple, here we
+             * respond with an HTTP 408 (Request Timeout) error */
+            httpd_resp_send_408(req);
+        }
+        /* In case of error, returning ESP_FAIL will
+         * ensure that the underlying socket is closed */
+        return ESP_FAIL;
+    }
+
+    // Parse the buffer into key/value pairs
+    char ssid[32];
+    char password[64];
+    ret = httpd_query_key_value(buf, "ssid", ssid, sizeof(ssid));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "password", password, sizeof(password));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(WEB_TAG, "Received Credentials. SSID: %s, Password: %s", ssid, password);
+
+    // Save the Wi-Fi credentials to NVS
+    save_ap_wifi_credentials_to_nvs(ssid, password);
 
     // Send a response
     httpd_resp_send(req, "OK", 2);
@@ -353,6 +419,7 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server_handle, &wifi_config_html_uri);
         httpd_register_uri_handler(server_handle, &restart_esp_uri);
         httpd_register_uri_handler(server_handle, &get_all_networks_uri);
+        httpd_register_uri_handler(server_handle, &wifi_ap_config_uri);
         return server_handle;
     }
 
@@ -445,6 +512,6 @@ void broadcast_adc_values(void* pvParameters) {
         httpd_ws_send_frame_to_all_clients(&ws_pkt);
 
         // Wait for 1 second
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(WS_INTERVAL_MS / portTICK_PERIOD_MS);
     }
 }

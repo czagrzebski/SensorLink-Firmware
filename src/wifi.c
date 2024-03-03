@@ -17,6 +17,7 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
         ESP_LOGI(WIFI_TAG, "station "MACSTR" join, AID=%d",
                  MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_STA_START) {
+        ESP_LOGI(WIFI_TAG, "STA started. Attempting to connect to a network.");
         esp_wifi_connect();
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
@@ -31,7 +32,17 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
         xTaskCreate(&wifi_reconnect, "wifi_reconnect", 4096, NULL, 5, NULL);
         if(get_wifi_mode() == WIFI_MODE_STA) {
             // Start the AP Mode since we're disconnected from the Station Network
-            wifi_init_softap();
+            // Get the SSID and Password from wifi_config_t
+            wifi_config_t* conf = (wifi_config_t*) malloc(sizeof(wifi_config_t));
+            char* ssid = (char*) malloc(MAX_SSID_LEN * sizeof(char));
+            char* password = (char*) malloc(MAX_PASSWORD_LEN * sizeof(char));
+            esp_wifi_get_config(WIFI_IF_AP, conf);
+            strcpy(ssid, (char*) conf->ap.ssid);
+            strcpy(password, (char*) conf->ap.password);
+            wifi_init_softap(ssid, password);
+            free(conf);
+            free(ssid);
+            free(password);
         }
     }
 }
@@ -61,6 +72,12 @@ char* get_mode(void) {
     } else {
         return "Unknown";
     }
+}
+
+// Set DHCP or Static IP Address
+esp_err_t set_ip_configuration(void) {
+    //TODO: Implemenet
+    return ESP_OK;
 }
 
 // Function to get all the Wi-Fi networks in the area. Return a char* array of SSIDs
@@ -101,10 +118,62 @@ ssid_list_t* get_wifi_networks(void) {
 }
 
 void wifi_reconnect(void *pvParameters) {
-    ESP_LOGI(WIFI_TAG, "Reconnecting to Station Network...");
-    vTaskDelay(pdMS_TO_TICKS(1200000)); 
-    esp_wifi_connect();
-    vTaskDelete(NULL); 
+    ESP_LOGI(WIFI_TAG, "Network Error. Attempting to reconnect to Network...");
+    vTaskDelay(pdMS_TO_TICKS(600000));  // wait for 1 minute
+    esp_wifi_connect(); // attempt to connect to network. if this fails, it will fire a event to connect again. else, it will fire a success event.
+    vTaskDelete(NULL);  // destroy current rtos task
+}
+
+network_info_t* get_network_info(void) {
+    network_info_t* net_info = (network_info_t*) malloc(sizeof(network_info_t));
+    esp_netif_ip_info_t ip_info;
+    wifi_config_t* sta_conf;
+    wifi_config_t* ap_conf;
+    esp_err_t err;
+
+    sta_conf = (wifi_config_t*) malloc(sizeof(wifi_config_t));
+    ap_conf = (wifi_config_t*) malloc(sizeof(wifi_config_t));
+
+    err = esp_wifi_get_config(WIFI_IF_STA, sta_conf);
+    if(err != ESP_OK) {
+        ESP_LOGI(WIFI_TAG, "Failed to get configuration for station interface");
+    }
+
+    err = esp_wifi_get_config(WIFI_IF_AP, ap_conf);
+    if(err != ESP_OK) {
+        ESP_LOGI(WIFI_TAG, "Failed to get configuration for AP interface");
+    }
+    
+    net_info->station_ip = (char*)malloc(16 * sizeof(char));
+    net_info->ap_ip = (char*)malloc(16 * sizeof(char));
+
+    // Get AP/Station IP Addresses
+    esp_netif_get_ip_info(sta_netif, &ip_info);
+    esp_ip4addr_ntoa(&ip_info.ip, net_info->station_ip, 16);
+    esp_netif_get_ip_info(ap_netif, &ip_info);
+    esp_ip4addr_ntoa(&ip_info.ip, net_info->ap_ip, 16);
+
+    // Get MAC Address
+    net_info->mac_address = get_mac_addr();
+
+    // Get SSID for AP/STA
+    net_info->station_ssid = (char*) malloc(MAX_SSID_LEN * sizeof(char));
+    strcpy(net_info->station_ssid, (char*) sta_conf->sta.ssid);
+
+    net_info->ap_ssid = (char*) malloc(MAX_SSID_LEN * sizeof(char));
+    strcpy(net_info->ap_ssid, (char*) ap_conf->ap.ssid);
+
+    // GET AP PASSWORD
+    net_info->ap_passkey = (char*) malloc(MAX_SSID_LEN * sizeof(char));
+    strcpy(net_info->ap_passkey, (char*) ap_conf->ap.password);
+
+    // Get the network adapter mode
+    net_info->mode = get_mode();
+
+    free(sta_conf);
+    free(ap_conf);
+
+    return net_info;
 }
 
 wifi_mode_t get_wifi_mode(void) {
@@ -144,7 +213,37 @@ void save_wifi_credentials_to_nvs(char *ssid, char *password) {
     nvs_close(nvs_handle);
 }
 
-esp_err_t fetch_credentials_from_nvs(char *ssid, char* passphrase) {
+void save_ap_wifi_credentials_to_nvs(char *ssid, char *password) {
+    // Save Wi-Fi Configuration to NVS and restart
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
+        return;
+    }
+
+    // Save the Wi-Fi Configuration to NVS
+    err = nvs_set_str(nvs_handle, "ap_ssid", ssid);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) saving ssid to NVS", esp_err_to_name(err));
+    }
+
+    err = nvs_set_str(nvs_handle, "ap_password", password);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) saving password to NVS", esp_err_to_name(err));
+    }
+
+    // Commit the changes to NVS
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) committing changes to NVS", esp_err_to_name(err));
+    }
+
+    nvs_close(nvs_handle);
+}
+
+esp_err_t fetch_sta_credentials_from_nvs(char *ssid, char* passphrase) {
     size_t required_size;
     nvs_handle_t nvs_handle;
     esp_err_t err;
@@ -164,10 +263,6 @@ esp_err_t fetch_credentials_from_nvs(char *ssid, char* passphrase) {
         return ESP_FAIL;
     }
 
-    // Allocate memory for the SSID
-    ssid = malloc(required_size);
-    memset(ssid, 0, required_size);
-
     // Read the stored Wi-Fi credentials from NVS
     err = nvs_get_str(nvs_handle, "ssid", ssid, &required_size);
     if (err != ESP_OK) {
@@ -179,9 +274,6 @@ esp_err_t fetch_credentials_from_nvs(char *ssid, char* passphrase) {
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGE(WIFI_TAG, "Error (%s) reading passphrase from NVS", esp_err_to_name(err));
     }
-
-    passphrase = malloc(required_size);
-    memset(passphrase, 0, required_size);
 
     err = nvs_get_str(nvs_handle, "password", passphrase, &required_size);
     if (err != ESP_OK) {
@@ -195,16 +287,75 @@ esp_err_t fetch_credentials_from_nvs(char *ssid, char* passphrase) {
     return ESP_OK;
 }
 
+esp_err_t fetch_ap_credentials_from_nvs(char *ssid, char* passphrase) {
+    size_t required_size;
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+
+    // Open the NVS Namespace
+    ESP_LOGI(WIFI_TAG, "Opening NVS Namespace");
+    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
+        return ESP_FAIL;
+    } 
+
+    // Get the size of the SSID
+    err = nvs_get_str(nvs_handle, "ap_ssid", NULL, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+
+    // Read the stored Wi-Fi credentials from NVS
+    err = nvs_get_str(nvs_handle, "ap_ssid", ssid, &required_size);
+    if (err != ESP_OK) {
+        strcpy(ssid, AP_SSID);
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
+    }
+
+    ESP_LOGI(WIFI_TAG, "Retrieving Password");
+    err = nvs_get_str(nvs_handle, "ap_password", NULL, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading passphrase from NVS", esp_err_to_name(err));
+    }
+
+    err = nvs_get_str(nvs_handle, "ap_password", passphrase, &required_size);
+    if (err != ESP_OK) {
+        strcpy(passphrase, AP_PASSPHRASE);
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading passphrase from NVS", esp_err_to_name(err));
+    }
+
+    nvs_close(nvs_handle);
+ 
+    ESP_LOGI(WIFI_TAG, "%s %s", passphrase, ssid);
+
+    return ESP_OK;
+}
+
 void init_wifi() {
     // Get Wi-Fi Configuration from NVS
     wifi_mode_t mode;
-    char* ssid = NULL;
-    char* passphrase = NULL;
+    char* sta_ssid = NULL;
+    char* sta_passphrase = NULL;
+    char* ap_ssid = NULL;
+    char* ap_passphrase = NULL;
 
-    ssid = (char*)malloc(33 * sizeof(char));
-    passphrase = (char*)malloc(64 * sizeof(char));
+    // Allocate memory for the SSID and Password
+    sta_ssid = (char*) malloc((MAX_SSID_LEN + 1) * sizeof(char));
+    sta_passphrase = (char*) malloc((MAX_PASSWORD_LEN + 1) * sizeof(char));
+    ap_ssid = (char*) malloc((MAX_SSID_LEN + 1) * sizeof(char));
+    ap_passphrase = (char*) malloc((MAX_PASSWORD_LEN + 1) * sizeof(char));
 
-    if(fetch_credentials_from_nvs(ssid, passphrase) == ESP_OK) {
+    if(fetch_ap_credentials_from_nvs(ap_ssid, ap_passphrase) == ESP_OK) {
+        ESP_LOGI(WIFI_TAG, "Retrieved Wi-Fi Configuration from NVS");
+        mode = WIFI_MODE_AP;
+    } else {
+        ESP_LOGI(WIFI_TAG, "Failed to retrieve AP Wi-Fi Configuration from NVS. Aborting..");
+        return;
+    }
+
+    if(fetch_sta_credentials_from_nvs(sta_ssid, sta_passphrase) == ESP_OK) {
         ESP_LOGI(WIFI_TAG, "Retrieved Wi-Fi Configuration from NVS");
         mode = WIFI_MODE_STA;
     } else {
@@ -212,27 +363,34 @@ void init_wifi() {
         mode = WIFI_MODE_AP;
     }
 
-    // Generic Wi-Fi Configuration
+    // Initialize the netif stack
     ESP_LOGI(WIFI_TAG, "Initializing the TCP/IP stack...");
     ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_ERROR_CHECK(esp_event_loop_create_default()); // TODO: move this to app entry, other services may need this event queue
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-    sta_netif = esp_netif_create_default_wifi_ap();
-    ap_netif = esp_netif_create_default_wifi_sta();
+    ap_netif = esp_netif_create_default_wifi_ap();
+    sta_netif = esp_netif_create_default_wifi_sta();
     
     // Allocate resources for the default WiFi driver. Initiates a task for the WiFi driver
     wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_config));
 
+    wifi_init_softap(ap_ssid, ap_passphrase);
+    wifi_init_sta(sta_ssid, sta_passphrase);
+
     // If we're in AP mode, start the softAP
     if (mode == WIFI_MODE_AP) {
-        wifi_init_softap();
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     } else if (mode == WIFI_MODE_STA) {
-        wifi_init_sta(ssid, passphrase);
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     }
 
-    free(ssid);
-    free(passphrase);
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    free(sta_ssid);
+    free(sta_passphrase);
+    free(ap_ssid);
+    free(ap_passphrase);
 }
 
 char* get_mac_addr(void) {
@@ -257,6 +415,10 @@ void wifi_init_sta(char* ssid, char* password) {
             },
         },
     };
+    
+    // Log length of SSID and Password
+    ESP_LOGI(WIFI_TAG, "SSID Length: %d", strlen(ssid));
+    ESP_LOGI(WIFI_TAG, "Password Length: %d", strlen(password));
 
     // Set the SSID and Password for the Station
     strcpy((char*)wifi_sta_config.sta.ssid, ssid);
@@ -265,14 +427,10 @@ void wifi_init_sta(char* ssid, char* password) {
     ESP_LOGI(WIFI_TAG, "Setting WiFi Station configuration SSID");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_sta_config));
-
-    ESP_LOGI(WIFI_TAG, "Starting WiFi...");
-    ESP_ERROR_CHECK(esp_wifi_start());
-
     ESP_LOGI(WIFI_TAG, "wifi_init_sta finished.");
 }
 
-void wifi_init_softap(void) {
+void wifi_init_softap(char* ssid, char* password) {
     ESP_LOGI(WIFI_TAG, "Initializing SoftAP Mode...");
 
     // Initializer and register event handler for the default network interface
@@ -281,17 +439,17 @@ void wifi_init_softap(void) {
     // Union that contains the configuration of the WiFi Access Point
     wifi_config_t wifi_config = {
         .ap = {
-            .ssid = AP_SSID,
-            .ssid_len = strlen(AP_SSID),
-            .password = AP_PASSPHRASE,
             .max_connection = 4,
             .authmode = WIFI_AUTH_WPA_WPA2_PSK,
         },
     };
 
+    // Set the SSID and Password for the Access Point
+    strcpy((char*)wifi_config.ap.ssid, ssid);
+    strcpy((char*)wifi_config.ap.password, password);
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
     ESP_LOGI(WIFI_TAG, "wifi_init_softap finished.");
 }
 
