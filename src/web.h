@@ -80,5 +80,6 @@ void broadcast_adc_values(void* pvParameters);
 esp_err_t httpd_ws_send_frame_to_all_clients(httpd_ws_frame_t *ws_pkt);
 httpd_handle_t start_webserver(void);
 esp_err_t wifi_ap_credential_handler(httpd_req_t *req);
+esp_err_t wifi_ip_handler(httpd_req_t *req);
 
 #endif

@@ -64,6 +64,15 @@ httpd_uri_t wifi_ap_config_uri = {
     .user_ctx = NULL
 };
 
+
+httpd_uri_t wifi_ip_config_uri = {
+    .uri      = "/ipv4-config",
+    .method   = HTTP_POST,
+    .handler  = wifi_ip_handler,
+    .user_ctx = NULL
+};
+
+
 httpd_uri_t wifi_config_html_uri = {
     .uri      = "/network",
     .method   = HTTP_GET,
@@ -137,6 +146,7 @@ esp_err_t index_handler(httpd_req_t *req) {
     }
 
     network_info_t* net_info = get_network_info();
+    ip_config_t* ip_info = fetch_ip_info_from_nvs();
 
     // Read the line by line, check for placeholders and replace them
     char line[1024];
@@ -172,11 +182,27 @@ esp_err_t index_handler(httpd_req_t *req) {
         newLine = replace_variable(newLine, "{{MODE}}", net_info->mode);
         free(temp);
 
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_STATIC_IP}}", ip_info->ip);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_GATEWAY}}", ip_info->gateway);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_NETMASK}}", ip_info->netmask);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_IP_MODE}}", ip_info->mode == 0 ? "0" : "1");
+        free(temp);
+
         httpd_resp_send_chunk(req, newLine, strlen(newLine));
         free(newLine);
     }
 
-    //free(mac_address);
+    // Free current network info
     free(net_info->ap_ip);
     free(net_info->station_ip);
     free(net_info->station_ssid);
@@ -184,6 +210,12 @@ esp_err_t index_handler(httpd_req_t *req) {
     free(net_info->mac_address);
     free(net_info->ap_passkey);
     free(net_info);
+
+    // Free stored static ip info
+    free(ip_info->ip);
+    free(ip_info->gateway);
+    free(ip_info->netmask);
+    free(ip_info);
 
     fclose(file);
     httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
@@ -254,6 +286,67 @@ esp_err_t wifi_credential_handler(httpd_req_t *req) {
 
     // Save the Wi-Fi credentials to NVS
     save_wifi_credentials_to_nvs(ssid, password);
+
+    // Send a response
+    httpd_resp_send(req, "OK", 2);
+
+    return ESP_OK;
+}
+
+esp_err_t wifi_ip_handler(httpd_req_t *req) {
+    char buf[1024];
+
+    // Clear the buffer
+    memset(buf, 0, sizeof(buf));
+
+    /* Truncate if content length larger than the buffer */
+    size_t recv_size = MIN(req->content_len, sizeof(buf));
+
+    int ret = httpd_req_recv(req, buf, recv_size);
+    if (ret <= 0) {  /* 0 return value indicates connection closed */
+        /* Check if timeout occurred */
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            /* In case of timeout one can choose to retry calling
+             * httpd_req_recv(), but to keep it simple, here we
+             * respond with an HTTP 408 (Request Timeout) error */
+            httpd_resp_send_408(req);
+        }
+        /* In case of error, returning ESP_FAIL will
+         * ensure that the underlying socket is closed */
+        return ESP_FAIL;
+    }
+
+    // Parse the buffer into key/value pairs
+    char static_ip[32];
+    char gateway[32];
+    char subnet[32];
+    char mode[8];
+
+    ret = httpd_query_key_value(buf, "static_ip", static_ip, sizeof(static_ip));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "gateway", gateway, sizeof(gateway));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "subnet", subnet, sizeof(subnet));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "mode", mode, sizeof(mode));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(WEB_TAG, "Received IP Configuration. IP: %s, Gateway: %s, Subnet: %s, Mode: %s", static_ip, gateway, subnet, mode);
+
+    // Save the Wi-Fi credentials to NVS (convert from char to uint8_t)
+    save_ip_info_to_nvs(static_ip, gateway, subnet, mode[0] - '0');
 
     // Send a response
     httpd_resp_send(req, "OK", 2);
@@ -420,6 +513,7 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server_handle, &restart_esp_uri);
         httpd_register_uri_handler(server_handle, &get_all_networks_uri);
         httpd_register_uri_handler(server_handle, &wifi_ap_config_uri);
+        httpd_register_uri_handler(server_handle, &wifi_ip_config_uri);
         return server_handle;
     }
 

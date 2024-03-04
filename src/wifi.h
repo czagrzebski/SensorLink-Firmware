@@ -26,6 +26,18 @@ typedef struct {
     char* ap_passkey;
 } network_info_t;
 
+typedef enum {
+    DHCP,
+    STATIC
+} IPMode;
+
+typedef struct {
+    IPMode mode;
+    char* ip;
+    char* gateway;
+    char* netmask;
+} ip_config_t;
+
 /**
  * @brief Event handler for WiFi events
  * 
@@ -115,5 +127,10 @@ char* get_mode(void);
 network_info_t* get_network_info(void);
 esp_err_t fetch_sta_credentials_from_nvs(char *ssid, char* passphrase);
 void save_ap_wifi_credentials_to_nvs(char *ssid, char *password);
+void start_wifi_ap(void);
+esp_err_t set_ip_configuration(char *ip, char* gateway, char* netmask);
+network_info_t* get_network_info(void);
+void save_ip_info_to_nvs(char* static_ip, char* gateway, char* subnet, uint8_t mode);
+ip_config_t* fetch_ip_info_from_nvs(void);
 
 #endif

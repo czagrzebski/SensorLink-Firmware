@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "sdkconfig.h": "c",
-        "wifi.h": "c"
+        "wifi.h": "c",
+        "inet.h": "c",
+        "cstdint": "c"
     }
 }

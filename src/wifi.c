@@ -6,6 +6,7 @@
 #include "esp_event.h"
 #include "nvs_flash.h"
 #include "string.h"
+#include "lwip/inet.h"
 
 // Interfaces
 esp_netif_t *sta_netif;
@@ -26,23 +27,23 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
     } else if (event_id == WIFI_EVENT_STA_CONNECTED) {
         ESP_LOGI(WIFI_TAG, "Connected to Station Network. Stopping AP Server...");
         // Stop the AP Mode since we're connected to the Station Network
+        ip_config_t* ip_config = fetch_ip_info_from_nvs();
+        if(ip_config->mode == STATIC) {
+            set_ip_configuration(ip_config->ip, ip_config->gateway, ip_config->netmask);
+        } else {
+            ESP_LOGI(WIFI_TAG, "DHCP Mode. Not setting IP Configuration");
+        }
+        free(ip_config->ip);
+        free(ip_config->gateway);
+        free(ip_config->netmask);
+        free(ip_config);
         stop_wifi_ap();
     } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
         wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
         xTaskCreate(&wifi_reconnect, "wifi_reconnect", 4096, NULL, 5, NULL);
+        ESP_LOGI(WIFI_TAG, "Disconnect Event");
         if(get_wifi_mode() == WIFI_MODE_STA) {
-            // Start the AP Mode since we're disconnected from the Station Network
-            // Get the SSID and Password from wifi_config_t
-            wifi_config_t* conf = (wifi_config_t*) malloc(sizeof(wifi_config_t));
-            char* ssid = (char*) malloc(MAX_SSID_LEN * sizeof(char));
-            char* password = (char*) malloc(MAX_PASSWORD_LEN * sizeof(char));
-            esp_wifi_get_config(WIFI_IF_AP, conf);
-            strcpy(ssid, (char*) conf->ap.ssid);
-            strcpy(password, (char*) conf->ap.password);
-            wifi_init_softap(ssid, password);
-            free(conf);
-            free(ssid);
-            free(password);
+            start_wifi_ap();
         }
     }
 }
@@ -75,8 +76,22 @@ char* get_mode(void) {
 }
 
 // Set DHCP or Static IP Address
-esp_err_t set_ip_configuration(void) {
-    //TODO: Implemenet
+esp_err_t set_ip_configuration(char *ip, char* gateway, char* netmask) {
+    esp_netif_ip_info_t ip_info;
+    memset(&ip_info, 0, sizeof(esp_netif_ip_info_t));
+    ip_info.ip.addr = ipaddr_addr(ip);
+    ip_info.gw.addr = ipaddr_addr(gateway);
+    ip_info.netmask.addr = ipaddr_addr(netmask);
+    if(esp_netif_dhcpc_stop(sta_netif) != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Failed to stop DHCP Client");
+        return ESP_FAIL;
+    }
+    if (esp_netif_set_ip_info(sta_netif, &ip_info) != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Failed to set IP Address");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(WIFI_TAG, "Successfully set IPv4 Configuration with IP: %s, Gateway: %s, Netmask: %s", ip, gateway, netmask);
     return ESP_OK;
 }
 
@@ -122,6 +137,105 @@ void wifi_reconnect(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(600000));  // wait for 1 minute
     esp_wifi_connect(); // attempt to connect to network. if this fails, it will fire a event to connect again. else, it will fire a success event.
     vTaskDelete(NULL);  // destroy current rtos task
+}
+
+
+void save_ip_info_to_nvs(char* static_ip, char* gateway, char* subnet, uint8_t mode) {
+    esp_err_t err;
+    nvs_handle_t nvs_handle;
+    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
+        return;
+    }
+
+    err = nvs_set_str(nvs_handle, "static_ip", static_ip);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) saving static ip to NVS", esp_err_to_name(err));
+    }
+
+    err = nvs_set_str(nvs_handle, "gateway", gateway);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) saving gateway to NVS", esp_err_to_name(err));
+    }
+
+    err = nvs_set_str(nvs_handle, "netmask", subnet);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) saving netmask to NVS", esp_err_to_name(err));
+    }
+
+    err = nvs_set_u8(nvs_handle, "mode", mode);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) saving mode to NVS", esp_err_to_name(err));
+    }
+
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) committing changes to NVS", esp_err_to_name(err));
+    }
+
+    nvs_close(nvs_handle);
+}
+
+ip_config_t* fetch_ip_info_from_nvs(void) {
+    esp_err_t err;
+    nvs_handle_t nvs_handle;
+    ip_config_t *ip_config = (ip_config_t*) malloc(sizeof(ip_config_t));
+    memset(ip_config, 0, sizeof(ip_config_t));
+    ip_config->mode = DHCP;
+
+    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
+    }
+
+    size_t required_size;
+    err = nvs_get_str(nvs_handle, "static_ip", NULL, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading ip from NVS", esp_err_to_name(err));
+    }
+
+    if (err == ESP_OK) {
+        ip_config->ip = (char*)malloc(required_size * sizeof(char));
+        err = nvs_get_str(nvs_handle, "static_ip", ip_config->ip, &required_size);
+        if (err != ESP_OK) {
+            ESP_LOGE(WIFI_TAG, "Error (%s) reading ip from NVS", esp_err_to_name(err));
+        }
+    }
+
+    err = nvs_get_str(nvs_handle, "gateway", NULL, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading gateway from NVS", esp_err_to_name(err));
+    }
+
+    if (err == ESP_OK) {
+        ip_config->gateway = (char*)malloc(required_size * sizeof(char));
+        err = nvs_get_str(nvs_handle, "gateway", ip_config->gateway, &required_size);
+        if (err != ESP_OK) {
+            ESP_LOGE(WIFI_TAG, "Error (%s) reading gateway from NVS", esp_err_to_name(err));
+        }
+    }
+
+    err = nvs_get_str(nvs_handle, "netmask", NULL, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading netmask from NVS", esp_err_to_name(err));
+    }
+
+    if (err == ESP_OK) {
+        ip_config->netmask = (char*)malloc(required_size * sizeof(char));
+        err = nvs_get_str(nvs_handle, "netmask", ip_config->netmask, &required_size);
+        if (err != ESP_OK) {
+            ESP_LOGE(WIFI_TAG, "Error (%s) reading netmask from NVS", esp_err_to_name(err));
+        }
+    }
+
+    err = nvs_get_u8(nvs_handle, "mode", (uint8_t*) &ip_config->mode);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGE(WIFI_TAG, "Error (%s) reading mode from NVS", esp_err_to_name(err));
+    }
+
+    nvs_close(nvs_handle);
+    return ip_config;
 }
 
 network_info_t* get_network_info(void) {
@@ -380,7 +494,7 @@ void init_wifi() {
 
     // If we're in AP mode, start the softAP
     if (mode == WIFI_MODE_AP) {
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     } else if (mode == WIFI_MODE_STA) {
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     }
@@ -420,9 +534,14 @@ void wifi_init_sta(char* ssid, char* password) {
     ESP_LOGI(WIFI_TAG, "SSID Length: %d", strlen(ssid));
     ESP_LOGI(WIFI_TAG, "Password Length: %d", strlen(password));
 
-    // Set the SSID and Password for the Station
-    strcpy((char*)wifi_sta_config.sta.ssid, ssid);
-    strcpy((char*)wifi_sta_config.sta.password, password);
+    if(strlen(ssid) == 0 || strlen(password) == 0) {
+        strcpy((char*)wifi_sta_config.sta.ssid, "NoNetwork");
+        strcpy((char*)wifi_sta_config.sta.password, "NoNetwork");
+    } else {
+        // Set the SSID and Password for the Station
+        strcpy((char*)wifi_sta_config.sta.ssid, ssid);
+        strcpy((char*)wifi_sta_config.sta.password, password);
+    }
 
     ESP_LOGI(WIFI_TAG, "Setting WiFi Station configuration SSID");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -451,6 +570,10 @@ void wifi_init_softap(char* ssid, char* password) {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
     ESP_LOGI(WIFI_TAG, "wifi_init_softap finished.");
+}
+
+void start_wifi_ap(void) {
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 }
 
 // Stop the Wi-Fi Access Point (AP) mode
