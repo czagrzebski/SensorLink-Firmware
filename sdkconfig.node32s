@@ -470,7 +470,7 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 # Wi-Fi Configuration Menu
 #
-CONFIG_AP_SSID="SensorLink"
+CONFIG_AP_SSID="SensorLink-Setup"
 CONFIG_AP_PASS="123456789"
 # end of Wi-Fi Configuration Menu
 

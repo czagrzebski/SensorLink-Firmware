@@ -51,6 +51,14 @@ void init_spiffs() {
 }
 
 
+void heap_monitor_task(void *pvParameter) {
+    while(1) {
+        ESP_LOGI(TAG, "Free heap: %d", (int) esp_get_free_heap_size());
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+
 void setup_io() {
     // Initialize the ADC with default configuration and calibrate it
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
@@ -88,6 +96,9 @@ void app_main() {
 
     // Create a task to broadcast a random value every second 
     xTaskCreate(broadcast_adc_values, "broadcast_adc_values", 4096, NULL, 5, NULL);
+
+    // Create a task to monitor the free heap size
+    //xTaskCreate(heap_monitor_task, "heap_monitor_task", 2048, NULL, 5, NULL);
 
     // Wait for the web server to be stopped
     while(server != NULL) {

@@ -183,6 +183,10 @@ ip_config_t* fetch_ip_info_from_nvs(void) {
     ip_config_t *ip_config = (ip_config_t*) malloc(sizeof(ip_config_t));
     memset(ip_config, 0, sizeof(ip_config_t));
     ip_config->mode = DHCP;
+    ip_config->gateway = NULL;
+    ip_config->ip = NULL;
+    ip_config->netmask = NULL;
+
 
     err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
@@ -229,9 +233,14 @@ ip_config_t* fetch_ip_info_from_nvs(void) {
         }
     }
 
-    err = nvs_get_u8(nvs_handle, "mode", (uint8_t*) &ip_config->mode);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGE(WIFI_TAG, "Error (%s) reading mode from NVS", esp_err_to_name(err));
+    // Get Mode
+    if(ip_config->ip == NULL || ip_config->gateway == NULL || ip_config->netmask == NULL) {
+        ip_config->mode = DHCP;
+    } else {
+        err = nvs_get_u8(nvs_handle, "mode", (uint8_t*) &ip_config->mode);
+        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGE(WIFI_TAG, "Error (%s) reading mode from NVS", esp_err_to_name(err));
+        }
     }
 
     nvs_close(nvs_handle);
@@ -460,6 +469,11 @@ void init_wifi() {
     sta_passphrase = (char*) malloc((MAX_PASSWORD_LEN + 1) * sizeof(char));
     ap_ssid = (char*) malloc((MAX_SSID_LEN + 1) * sizeof(char));
     ap_passphrase = (char*) malloc((MAX_PASSWORD_LEN + 1) * sizeof(char));
+
+    memset(sta_ssid, 0, MAX_SSID_LEN + 1);
+    memset(sta_passphrase, 0, MAX_PASSWORD_LEN + 1);
+    memset(ap_ssid, 0, MAX_SSID_LEN + 1);
+    memset(ap_passphrase, 0, MAX_PASSWORD_LEN + 1);
 
     if(fetch_ap_credentials_from_nvs(ap_ssid, ap_passphrase) == ESP_OK) {
         ESP_LOGI(WIFI_TAG, "Retrieved Wi-Fi Configuration from NVS");

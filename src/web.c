@@ -203,21 +203,54 @@ esp_err_t index_handler(httpd_req_t *req) {
     }
 
     // Free current network info
-    free(net_info->ap_ip);
-    free(net_info->station_ip);
-    free(net_info->station_ssid);
-    free(net_info->ap_ssid);
-    free(net_info->mac_address);
-    free(net_info->ap_passkey);
-    free(net_info);
+
+    if (net_info->ap_ip != NULL) {
+        free(net_info->ap_ip);
+    }
+
+    if (net_info->station_ip != NULL) {
+        free(net_info->station_ip);
+    }
+
+    if (net_info->station_ssid != NULL) {
+        free(net_info->station_ssid);
+    }
+
+    if (net_info->ap_ssid != NULL) {
+        free(net_info->ap_ssid);
+    }
+
+    if (net_info->mac_address != NULL) {
+        free(net_info->mac_address);
+    }
+
+    if (net_info->ap_passkey != NULL) {
+        free(net_info->ap_passkey);
+    }
+
+    if (net_info != NULL) {
+        free(net_info);
+    }
 
     // Free stored static ip info
-    free(ip_info->ip);
-    free(ip_info->gateway);
-    free(ip_info->netmask);
-    free(ip_info);
+    if (ip_info->ip != NULL) {
+        free(ip_info->ip);
+    }
+
+    if (ip_info->gateway != NULL) {
+        free(ip_info->gateway);
+    }
+
+    if (ip_info->netmask != NULL) {
+        free(ip_info->netmask);
+    }
+
+    if (ip_info != NULL) {
+        free(ip_info);
+    }
 
     fclose(file);
+
     httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
     return ESP_OK;
 }
@@ -522,6 +555,13 @@ httpd_handle_t start_webserver(void) {
 
 char* replace_variable(char* source, char* placeholder, char* replacement) {
     const char *p = source;
+
+    // If either the placeholder or replacement is NULL, return the source string
+    if(replacement == NULL) {
+        // If replacement is NULL, replace with an empty string
+        replacement = "";
+    }
+
     int count = 0;
     int placeholderLen = strlen(placeholder);
     int replacementLen = strlen(replacement);
