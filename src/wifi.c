@@ -494,6 +494,9 @@ void init_wifi() {
     // Initialize the netif stack
     ESP_LOGI(WIFI_TAG, "Initializing the TCP/IP stack...");
     ESP_ERROR_CHECK(esp_netif_init());
+    
+    // Initializer and register event handler for the default network interface
+    // Creates a network interface instance by binding the Wi-Fi driver and TCP/IP stack
     ESP_ERROR_CHECK(esp_event_loop_create_default()); // TODO: move this to app entry, other services may need this event queue
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
     ap_netif = esp_netif_create_default_wifi_ap();
@@ -548,6 +551,8 @@ void wifi_init_sta(char* ssid, char* password) {
     ESP_LOGI(WIFI_TAG, "SSID Length: %d", strlen(ssid));
     ESP_LOGI(WIFI_TAG, "Password Length: %d", strlen(password));
 
+    // If the SSID or Password is empty, set the SSID and Password to "NoNetwork"
+    // Otherwise, an empty SSID or Password causes STA to hang
     if(strlen(ssid) == 0 || strlen(password) == 0) {
         strcpy((char*)wifi_sta_config.sta.ssid, "NoNetwork");
         strcpy((char*)wifi_sta_config.sta.password, "NoNetwork");
@@ -565,9 +570,6 @@ void wifi_init_sta(char* ssid, char* password) {
 
 void wifi_init_softap(char* ssid, char* password) {
     ESP_LOGI(WIFI_TAG, "Initializing SoftAP Mode...");
-
-    // Initializer and register event handler for the default network interface
-    // Creates a network interface instance by binding the Wi-Fi driver and TCP/IP stack
 
     // Union that contains the configuration of the WiFi Access Point
     wifi_config_t wifi_config = {

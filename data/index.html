@@ -240,7 +240,7 @@
                     Security Settings
                 </button>
                 <button class="" onclick="openTab('otaSettings')">
-                    OTA Settings
+                    Firmware Upgrade
                 </button>
                 <button class="" onclick="rebootDevice()">Reboot Link</button>
             </div>
@@ -439,25 +439,6 @@
                         </form>
                     </div>
                     <div class="card">
-                        <h1>Network Mode</h1>
-                        <p>
-                            Choose whether to use the SensorLink in Access Point
-                            (broadcast network) or Station Mode (connect to an
-                            existing network).
-                        </p>
-                        <p>
-                            When the device is in station mode but the network
-                            is unavailable, the Access Point will automatically
-                            start.
-                        </p>
-                        <select>
-                            <option value="station">
-                                Station Mode with Access Point Backup
-                            </option>
-                            <option value="ap">Access Point Mode Only</option>
-                        </select>
-                    </div>
-                    <div class="card">
                         <h1>Network Status</h1>
                         <p>
                             <b>Wi-Fi Mode:</b>
@@ -532,13 +513,69 @@
                             </p>
                         </form>
                     </div>
+                    <div class="card">
+                        <h1>MQTT Interval</h1>
+                        <p>
+                            Set the update interval for the MQTT Broker.
+                        </p>
+                        <form
+                            id="ap-forms"
+                            onsubmit=""
+                        >
+                            <p>
+                                <label for="ap-ssid">Update Interval (in ms)</label>
+                                <input
+                                    type="text"
+                                    id="ap-ssid"
+                                    name="ap-ssid"
+                                    required
+                                />
+                            </p>
+                            <p>
+                                <button type="submit">
+                                    Save MQTT Parameters
+                                </button>
+                            </p>
+                        </form>
+                    </div>
                 </div>
             </div>
             <div id="securitySettings" class="tab" style="display: None">
                 <h2 style="text-align: center">Security Settings</h2>
             </div>
             <div id="otaSettings" class="tab" style="display: None">
-                <h2 style="text-align: center">Over-the-Air Update Settings</h2>
+                <h2 style="text-align: center">Firmware Upgrade</h2>
+                <div class="card-container">
+                    <div class="card">
+                        <h1>Upload Firmware File</h1>
+                        <p>
+                            Upload a binary firmware file to upgrade the device using the OTA method.
+                        </p>
+                        <form
+                            id="ota-form"
+                            onsubmit=""
+                        >
+                            <p>
+                                <label for="firmware">Firmware File</label>
+                                <input
+                                    type="file"
+                                    id="firmware"
+                                    name="firmware"
+                                    accept=".bin,.bin.gz"
+                                    required
+                                />
+                            </p>
+                            <p>
+                                <button type="submit">
+                                    Upload Firmware
+                                </button>
+                            </p>
+                            <p>
+                                <button type="button" onclick="">
+                                    Revert Firmware
+                                </button>
+                            </p>
+                    </div>
             </div>
             <script>
                 // Function to add new data to the graph

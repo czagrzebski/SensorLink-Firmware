@@ -466,6 +466,7 @@ esp_err_t get_all_networks_handler(httpd_req_t *req) {
     strcat(json, "]");
     httpd_resp_send(req, json, strlen(json));
     free(json);
+    
     // free each ssid
     for(int i = 0; i < ssid_list->size; i++) {
         free(ssid_list->ssid_list[i]);

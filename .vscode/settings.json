@@ -3,6 +3,7 @@
         "sdkconfig.h": "c",
         "wifi.h": "c",
         "inet.h": "c",
-        "cstdint": "c"
+        "cstdint": "c",
+        "main.h": "c"
     }
 }
