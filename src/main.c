@@ -14,6 +14,7 @@
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include "string.h"
+#include "led_strip.h"
 #include "stdlib.h"
 #include "esp_event.h"
 #include "esp_spiffs.h"
@@ -27,6 +28,49 @@
 #include "lwip/sys.h"
 
 const char* TAG = "main";
+
+led_strip_handle_t configure_led(void) {
+  
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = LED_STRIP_GPIO,  
+        .max_leds = 1,      
+        .led_pixel_format = LED_PIXEL_FORMAT_GRB, 
+        .led_model = LED_MODEL_WS2812,            
+        .flags.invert_out = false,                
+    };
+
+    // LED strip backend configuration: RMT
+    led_strip_rmt_config_t rmt_config = {
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+        .rmt_channel = 0,
+#else
+        .clk_src = RMT_CLK_SRC_DEFAULT,        // different clock source can lead to different power consumption
+        .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
+        .flags.with_dma = false,               // DMA feature is available on ESP target like ESP32-S3
+#endif
+    };
+
+    // LED Strip object handle
+    led_strip_handle_t led_strip;
+    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
+    ESP_LOGI(TAG, "Created LED strip object with RMT backend");
+    return led_strip;
+}
+
+void led_status_task(void *pvParameter) {
+    led_strip_handle_t led_strip = (led_strip_handle_t) pvParameter;
+
+    // Check network status
+    while(1) {
+        if(get_wifi_mode() == WIFI_MODE_STA) {
+            ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, 0, 255, 0));
+        } else {
+            ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, 0, 0, 255));
+        }
+        ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
 
 void init_spiffs() {
     ESP_LOGI(TAG, "Initializing NVS flash memory...");
@@ -50,37 +94,14 @@ void init_spiffs() {
     esp_vfs_spiffs_register(&config);
 }
 
-esp_err_t init_network() {
-    // Get wifi.txt file from SPIFFS
-    ESP_LOGI(TAG, "Opening wifi.txt file...");
-    FILE* f = fopen("/spiffs/wifi.txt", "r");
-    if(f == NULL) {
-        ESP_LOGE(TAG, "Failed to open wifi.txt file!");
-        return ESP_FAIL;
+
+void heap_monitor_task(void *pvParameter) {
+    while(1) {
+        ESP_LOGI(TAG, "Free heap: %d", (int) esp_get_free_heap_size());
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-
-    // Read the file contents into a buffer
-    ESP_LOGI(TAG, "Reading wifi.txt file...");
-    char* buffer = malloc(1024);
-    if(buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for wifi.txt buffer!");
-        return ESP_FAIL;
-    }
-    memset(buffer, 0, 1024);
-    fread(buffer, 1, 1024, f);
-    fclose(f);
-
-    // Parse the file contents (SSID and password, each on a new line, separated by equals sign)
-    ESP_LOGI(TAG, "Parsing wifi.txt file...");
-    char* ssid = strtok(buffer, "\n");
-    char* password = strtok(NULL, "\n");
-
-    // Print the parsed values
-    ESP_LOGI(TAG, "SSID: %s", ssid);
-    ESP_LOGI(TAG, "Password: %s", password);
-
-    return ESP_OK;
 }
+
 
 void setup_io() {
     // Initialize the ADC with default configuration and calibrate it
@@ -94,16 +115,26 @@ void setup_io() {
 
     // Configure the GPIO pin as an input/output pin
     ESP_ERROR_CHECK(gpio_set_direction(OUTPUT_GPIO_PIN, GPIO_MODE_INPUT_OUTPUT)); 
+   
 }
 
+// Main application entry point
 void app_main() {
     // Initialize the Serial Peripheral Interface Flash File System (SPIFFS)
     init_spiffs();
 
-    // Initialize the WiFi Access Point
-    init_network();
+    // Initialize the LED strip
+    led_strip_handle_t led_strip = configure_led();
+
+    // Set Color to Red for Initialization
+    ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, 255, 0, 0));
+    ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+
+    // Initialize the event loop
+    ESP_ERROR_CHECK(esp_event_loop_create_default()); 
     
-    wifi_init_softap();
+    // Initialize the WiFi connection and connect to the network
+    init_wifi();
 
     // Start the web server
     ESP_LOGI(TAG, "Starting the web server...");
@@ -117,8 +148,14 @@ void app_main() {
     // Setup the GPIO pins
     setup_io();
 
-    // Create a task to broadcast a random value every second
+    // Create a task to broadcast a random value every second 
     xTaskCreate(broadcast_adc_values, "broadcast_adc_values", 4096, NULL, 5, NULL);
+
+    // Create a task to monitor the free heap size
+    //xTaskCreate(heap_monitor_task, "heap_monitor_task", 2048, NULL, 5, NULL);
+
+    // Start LED status task
+    xTaskCreate(led_status_task, "led_status_task", 2048, led_strip, 5, NULL);
 
     // Wait for the web server to be stopped
     while(server != NULL) {

@@ -2,6 +2,7 @@
 
 #include "esp_wifi.h"
 #include "esp_mac.h"
+#include "wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "string.h"
@@ -11,15 +12,15 @@
 #include "driver/adc.h"
 
 // Import MIN function
-/* #ifndef MIN
+#ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
-#endif */
+#endif 
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
 // Define GIT_COMMIT_HASH if it's not already defined
-// stops the compiler from complaining about undefined variables
+// stops GCC from whining about an undefined macro
 #ifndef GIT_COMMIT_HASH
 #define GIT_COMMIT_HASH "undefined"
 #endif
@@ -49,6 +50,29 @@ httpd_uri_t uri_version = {
     .is_websocket = true
 };
 
+httpd_uri_t wifi_config_uri = {
+    .uri      = "/wifi-save-creds",
+    .method   = HTTP_POST,
+    .handler  = wifi_credential_handler,
+    .user_ctx = NULL
+};
+
+httpd_uri_t wifi_ap_config_uri = {
+    .uri      = "/wifi-save-ap-creds",
+    .method   = HTTP_POST,
+    .handler  = wifi_ap_credential_handler,
+    .user_ctx = NULL
+};
+
+
+httpd_uri_t wifi_ip_config_uri = {
+    .uri      = "/ipv4-config",
+    .method   = HTTP_POST,
+    .handler  = wifi_ip_handler,
+    .user_ctx = NULL
+};
+
+
 httpd_uri_t chart_js_uri = {
     .uri      = "/chartjs",
     .method   = HTTP_GET,
@@ -60,6 +84,20 @@ httpd_uri_t toggle_led_uri = {
     .uri      = "/led",
     .method   = HTTP_GET,
     .handler  = toggle_led_handler,
+    .user_ctx = NULL
+};
+
+httpd_uri_t restart_esp_uri = {
+    .uri      = "/restart",
+    .method   = HTTP_GET,
+    .handler  = restart_esp_handler,
+    .user_ctx = NULL
+};
+
+httpd_uri_t get_all_networks_uri = {
+    .uri      = "/networks",
+    .method   = HTTP_GET,
+    .handler  = get_all_networks_handler,
     .user_ctx = NULL
 };
 
@@ -100,6 +138,127 @@ esp_err_t index_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
+    network_info_t* net_info = get_network_info();
+    ip_config_t* ip_info = fetch_ip_info_from_nvs();
+
+    // Read the line by line, check for placeholders and replace them
+    char line[1024];
+    while(fgets(line, sizeof(line), file)) {
+        char *temp = NULL;
+        char* newLine = replace_variable(line, "{{GIT_COMMIT_HASH}}", GIT_COMMIT_HASH);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{MAC_ADDRESS}}", net_info->mac_address);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{AP_IP}}", net_info->ap_ip);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine,"{{STA_SSID}}", net_info->station_ssid);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{AP_SSID}}", net_info->ap_ssid);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{AP_PASSKEY}}", net_info->ap_passkey);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_IP}}", net_info->station_ip);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{MODE}}", net_info->mode);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_STATIC_IP}}", ip_info->ip);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_GATEWAY}}", ip_info->gateway);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_NETMASK}}", ip_info->netmask);
+        free(temp);
+
+        temp = newLine;
+        newLine = replace_variable(newLine, "{{STA_IP_MODE}}", ip_info->mode == 0 ? "0" : "1");
+        free(temp);
+
+        httpd_resp_send_chunk(req, newLine, strlen(newLine));
+        free(newLine);
+    }
+
+    // Free current network info
+
+    if (net_info->ap_ip != NULL) {
+        free(net_info->ap_ip);
+    }
+
+    if (net_info->station_ip != NULL) {
+        free(net_info->station_ip);
+    }
+
+    if (net_info->station_ssid != NULL) {
+        free(net_info->station_ssid);
+    }
+
+    if (net_info->ap_ssid != NULL) {
+        free(net_info->ap_ssid);
+    }
+
+    if (net_info->mac_address != NULL) {
+        free(net_info->mac_address);
+    }
+
+    if (net_info->ap_passkey != NULL) {
+        free(net_info->ap_passkey);
+    }
+
+    if (net_info != NULL) {
+        free(net_info);
+    }
+
+    // Free stored static ip info
+    if (ip_info->ip != NULL) {
+        free(ip_info->ip);
+    }
+
+    if (ip_info->gateway != NULL) {
+        free(ip_info->gateway);
+    }
+
+    if (ip_info->netmask != NULL) {
+        free(ip_info->netmask);
+    }
+
+    if (ip_info != NULL) {
+        free(ip_info);
+    }
+
+    fclose(file);
+
+    // Finalize the response
+    httpd_resp_send_chunk(req, NULL, 0); 
+    return ESP_OK;
+}
+
+esp_err_t network_page_handler(httpd_req_t *req) {
+    // Open file from SPIFFS
+    ESP_LOGI(WEB_TAG, "Request received!");
+
+    FILE* file = fopen("/spiffs/network.html", "r");
+    if (file == NULL) {
+        httpd_resp_send_404(req);
+        return ESP_FAIL;
+    }
+
     // Read the line by line, check for placeholders and replace them
     char line[1024];
     while(fgets(line, sizeof(line), file)) {
@@ -110,6 +269,190 @@ esp_err_t index_handler(httpd_req_t *req) {
 
     fclose(file);
     httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
+    return ESP_OK;
+}
+
+esp_err_t wifi_credential_handler(httpd_req_t *req) {
+    char buf[1024];
+
+    // Clear the buffer
+    memset(buf, 0, sizeof(buf));
+
+    /* Truncate if content length larger than the buffer */
+    size_t recv_size = MIN(req->content_len, sizeof(buf));
+
+    int ret = httpd_req_recv(req, buf, recv_size);
+    if (ret <= 0) {  /* 0 return value indicates connection closed */
+        /* Check if timeout occurred */
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+
+    // Parse the buffer into key/value pairs
+    char ssid[32];
+    char password[64];
+    ret = httpd_query_key_value(buf, "ssid", ssid, sizeof(ssid));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "password", password, sizeof(password));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(WEB_TAG, "Received Credentials. SSID: %s, Password: %s", ssid, password);
+
+    // Save the Wi-Fi credentials to NVS
+    save_wifi_credentials_to_nvs(ssid, password);
+
+    // Send a response
+    httpd_resp_send(req, "OK", 2);
+
+    return ESP_OK;
+}
+
+esp_err_t wifi_ip_handler(httpd_req_t *req) {
+    char buf[1024];
+
+    // Clear the buffer
+    memset(buf, 0, sizeof(buf));
+
+    /* Truncate if content length larger than the buffer */
+    size_t recv_size = MIN(req->content_len, sizeof(buf));
+
+    int ret = httpd_req_recv(req, buf, recv_size);
+    if (ret <= 0) {  /* 0 return value indicates connection closed */
+        /* Check if timeout occurred */
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+
+    // Parse the buffer into key/value pairs
+    char static_ip[32];
+    char gateway[32];
+    char subnet[32];
+    char mode[8];
+
+    ret = httpd_query_key_value(buf, "static_ip", static_ip, sizeof(static_ip));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "gateway", gateway, sizeof(gateway));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "subnet", subnet, sizeof(subnet));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "mode", mode, sizeof(mode));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(WEB_TAG, "Received IP Configuration. IP: %s, Gateway: %s, Subnet: %s, Mode: %s", static_ip, gateway, subnet, mode);
+
+    // Save the Wi-Fi credentials to NVS (convert from char to uint8_t)
+    save_ip_info_to_nvs(static_ip, gateway, subnet, mode[0] - '0');
+
+    // Send a response
+    httpd_resp_send(req, "OK", 2);
+
+    return ESP_OK;
+}
+
+esp_err_t wifi_ap_credential_handler(httpd_req_t *req) {
+    char buf[1024];
+
+    // Clear the buffer
+    memset(buf, 0, sizeof(buf));
+
+    /* Truncate if content length larger than the buffer */
+    size_t recv_size = MIN(req->content_len, sizeof(buf));
+
+    int ret = httpd_req_recv(req, buf, recv_size);
+    if (ret <= 0) {  /* 0 return value indicates connection closed */
+        /* Check if timeout occurred */
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+
+    // Parse the buffer into key/value pairs
+    char ssid[32];
+    char password[64];
+    ret = httpd_query_key_value(buf, "ssid", ssid, sizeof(ssid));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    ret = httpd_query_key_value(buf, "password", password, sizeof(password));
+    if (ret != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(WEB_TAG, "Received Credentials. SSID: %s, Password: %s", ssid, password);
+
+    // Save the Wi-Fi credentials to NVS
+    save_ap_wifi_credentials_to_nvs(ssid, password);
+
+    // Send a response
+    httpd_resp_send(req, "OK", 2);
+
+    return ESP_OK;
+}
+
+esp_err_t restart_esp_handler(httpd_req_t *req) {
+
+    // Send a response
+    httpd_resp_send(req, "OK", 2);
+
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+
+    // Restart the ESP
+    esp_restart();
+    return ESP_OK;
+}
+
+esp_err_t get_all_networks_handler(httpd_req_t *req) {
+    ssid_list_t* ssid_list = get_wifi_networks();
+
+    // Send the list of networks as a JSON array
+    httpd_resp_set_type(req, "application/json");
+    // build entire json string first
+    char* json = (char*)malloc(1024);
+    strcpy(json, "[");
+    for(int i = 0; i < ssid_list->size; i++) {
+        strcat(json, "\"");
+        strcat(json, ssid_list->ssid_list[i]);
+        strcat(json, "\"");
+        if (i < ssid_list->size - 1) {
+            strcat(json, ",");
+        }
+    }
+    strcat(json, "]");
+    httpd_resp_send(req, json, strlen(json));
+    free(json);
+    
+    // free each ssid
+    for(int i = 0; i < ssid_list->size; i++) {
+        free(ssid_list->ssid_list[i]);
+    }
+    // free the list
+    free(ssid_list->ssid_list);
+    free(ssid_list);
     return ESP_OK;
 }
 
@@ -168,6 +511,8 @@ esp_err_t ws_handler(httpd_req_t *req) {
 // Start the web server
 httpd_handle_t start_webserver(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+    config.max_uri_handlers = 16;
     
     if(httpd_start(&server_handle, &config) == ESP_OK) {
         // Register URI handlers
@@ -176,14 +521,26 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server_handle, &uri_version);
         httpd_register_uri_handler(server_handle, &chart_js_uri);
         httpd_register_uri_handler(server_handle, &toggle_led_uri);
+        httpd_register_uri_handler(server_handle, &wifi_config_uri);
+        httpd_register_uri_handler(server_handle, &restart_esp_uri);
+        httpd_register_uri_handler(server_handle, &get_all_networks_uri);
+        httpd_register_uri_handler(server_handle, &wifi_ap_config_uri);
+        httpd_register_uri_handler(server_handle, &wifi_ip_config_uri);
         return server_handle;
     }
 
     return NULL;
 }
 
-char* replace_variable(const char* source, const char* placeholder, const char* replacement) {
+char* replace_variable(char* source, char* placeholder, char* replacement) {
     const char *p = source;
+
+    // If either the placeholder or replacement is NULL, return the source string
+    if(replacement == NULL) {
+        // If replacement is NULL, replace with an empty string
+        replacement = "";
+    }
+
     int count = 0;
     int placeholderLen = strlen(placeholder);
     int replacementLen = strlen(replacement);
@@ -210,7 +567,6 @@ char* replace_variable(const char* source, const char* placeholder, const char* 
         }
     }
     *newStr = '\0';
-
     return result;
 }
 
@@ -269,6 +625,6 @@ void broadcast_adc_values(void* pvParameters) {
         httpd_ws_send_frame_to_all_clients(&ws_pkt);
 
         // Wait for 1 second
-        vTaskDelay(250 / portTICK_PERIOD_MS);
+        vTaskDelay(WS_INTERVAL_MS / portTICK_PERIOD_MS);
     }
 }
