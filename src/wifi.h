@@ -124,13 +124,70 @@ char** get_sta_ap_ip(void);
  */
 char* get_mode(void);
 
+/**
+ * @brief Get the network info object
+ * 
+ * @return network_info_t* 
+ */
 network_info_t* get_network_info(void);
+
+/**
+ * @brief Fetches the station credentials from the Non-Volatile Storage (NVS)
+ * 
+ * @param ssid 
+ * @param passphrase 
+ * @return esp_err_t 
+ */
 esp_err_t fetch_sta_credentials_from_nvs(char *ssid, char* passphrase);
+
+/**
+ * @brief Writes the access point credentials to the Non-Volatile Storage (NVS)
+ * 
+ * @param ssid 
+ * @param password 
+ */
 void save_ap_wifi_credentials_to_nvs(char *ssid, char *password);
+
+/**
+ * @brief Switches Wi-Fi Mode to AP STA
+ * 
+ */
 void start_wifi_ap(void);
+
+/**
+ * @brief Set the ip configuration to the given ip, gateway, and netmask
+ * 
+ * @param ip 
+ * @param gateway 
+ * @param netmask 
+ * @return esp_err_t 
+ */
 esp_err_t set_ip_configuration(char *ip, char* gateway, char* netmask);
+
+/**
+ * @brief Returns info about the current network
+ * 
+ * @return network_info_t* 
+ */
 network_info_t* get_network_info(void);
+
+/**
+ * @brief Saves IP configuration to the Non-Volatile Storage (NVS)
+ * 
+ * @param static_ip - static IP address
+ * @param gateway  - gateway
+ * @param subnet - subnet
+ * @param mode - mode
+ */
 void save_ip_info_to_nvs(char* static_ip, char* gateway, char* subnet, uint8_t mode);
+
+/**
+ * @brief Fetches the IP configuration from the Non-Volatile Storage (NVS)
+ * 
+ * @return ip_config_t* 
+ */
 ip_config_t* fetch_ip_info_from_nvs(void);
+
+int is_wifi_connected(void);
 
 #endif

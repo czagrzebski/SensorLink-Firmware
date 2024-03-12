@@ -14,6 +14,7 @@
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include "string.h"
+#include "led_strip.h"
 #include "stdlib.h"
 #include "esp_event.h"
 #include "esp_spiffs.h"
@@ -27,6 +28,49 @@
 #include "lwip/sys.h"
 
 const char* TAG = "main";
+
+led_strip_handle_t configure_led(void) {
+  
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = LED_STRIP_GPIO,  
+        .max_leds = 1,      
+        .led_pixel_format = LED_PIXEL_FORMAT_GRB, 
+        .led_model = LED_MODEL_WS2812,            
+        .flags.invert_out = false,                
+    };
+
+    // LED strip backend configuration: RMT
+    led_strip_rmt_config_t rmt_config = {
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+        .rmt_channel = 0,
+#else
+        .clk_src = RMT_CLK_SRC_DEFAULT,        // different clock source can lead to different power consumption
+        .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
+        .flags.with_dma = false,               // DMA feature is available on ESP target like ESP32-S3
+#endif
+    };
+
+    // LED Strip object handle
+    led_strip_handle_t led_strip;
+    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
+    ESP_LOGI(TAG, "Created LED strip object with RMT backend");
+    return led_strip;
+}
+
+void led_status_task(void *pvParameter) {
+    led_strip_handle_t led_strip = (led_strip_handle_t) pvParameter;
+
+    // Check network status
+    while(1) {
+        if(get_wifi_mode() == WIFI_MODE_STA) {
+            ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, 0, 255, 0));
+        } else {
+            ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, 0, 0, 255));
+        }
+        ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
 
 void init_spiffs() {
     ESP_LOGI(TAG, "Initializing NVS flash memory...");
@@ -78,6 +122,16 @@ void setup_io() {
 void app_main() {
     // Initialize the Serial Peripheral Interface Flash File System (SPIFFS)
     init_spiffs();
+
+    // Initialize the LED strip
+    led_strip_handle_t led_strip = configure_led();
+
+    // Set Color to Red for Initialization
+    ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, 255, 0, 0));
+    ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+
+    // Initialize the event loop
+    ESP_ERROR_CHECK(esp_event_loop_create_default()); 
     
     // Initialize the WiFi connection and connect to the network
     init_wifi();
@@ -99,6 +153,9 @@ void app_main() {
 
     // Create a task to monitor the free heap size
     //xTaskCreate(heap_monitor_task, "heap_monitor_task", 2048, NULL, 5, NULL);
+
+    // Start LED status task
+    xTaskCreate(led_status_task, "led_status_task", 2048, led_strip, 5, NULL);
 
     // Wait for the web server to be stopped
     while(server != NULL) {

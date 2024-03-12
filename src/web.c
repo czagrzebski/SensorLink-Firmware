@@ -73,13 +73,6 @@ httpd_uri_t wifi_ip_config_uri = {
 };
 
 
-httpd_uri_t wifi_config_html_uri = {
-    .uri      = "/network",
-    .method   = HTTP_GET,
-    .handler  = network_page_handler,
-    .user_ctx = NULL
-};
-
 httpd_uri_t chart_js_uri = {
     .uri      = "/chartjs",
     .method   = HTTP_GET,
@@ -251,7 +244,8 @@ esp_err_t index_handler(httpd_req_t *req) {
 
     fclose(file);
 
-    httpd_resp_send_chunk(req, NULL, 0); // Finalize the response
+    // Finalize the response
+    httpd_resp_send_chunk(req, NULL, 0); 
     return ESP_OK;
 }
 
@@ -291,13 +285,8 @@ esp_err_t wifi_credential_handler(httpd_req_t *req) {
     if (ret <= 0) {  /* 0 return value indicates connection closed */
         /* Check if timeout occurred */
         if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            /* In case of timeout one can choose to retry calling
-             * httpd_req_recv(), but to keep it simple, here we
-             * respond with an HTTP 408 (Request Timeout) error */
             httpd_resp_send_408(req);
         }
-        /* In case of error, returning ESP_FAIL will
-         * ensure that the underlying socket is closed */
         return ESP_FAIL;
     }
 
@@ -339,13 +328,8 @@ esp_err_t wifi_ip_handler(httpd_req_t *req) {
     if (ret <= 0) {  /* 0 return value indicates connection closed */
         /* Check if timeout occurred */
         if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            /* In case of timeout one can choose to retry calling
-             * httpd_req_recv(), but to keep it simple, here we
-             * respond with an HTTP 408 (Request Timeout) error */
             httpd_resp_send_408(req);
         }
-        /* In case of error, returning ESP_FAIL will
-         * ensure that the underlying socket is closed */
         return ESP_FAIL;
     }
 
@@ -400,13 +384,8 @@ esp_err_t wifi_ap_credential_handler(httpd_req_t *req) {
     if (ret <= 0) {  /* 0 return value indicates connection closed */
         /* Check if timeout occurred */
         if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            /* In case of timeout one can choose to retry calling
-             * httpd_req_recv(), but to keep it simple, here we
-             * respond with an HTTP 408 (Request Timeout) error */
             httpd_resp_send_408(req);
         }
-        /* In case of error, returning ESP_FAIL will
-         * ensure that the underlying socket is closed */
         return ESP_FAIL;
     }
 
@@ -543,7 +522,6 @@ httpd_handle_t start_webserver(void) {
         httpd_register_uri_handler(server_handle, &chart_js_uri);
         httpd_register_uri_handler(server_handle, &toggle_led_uri);
         httpd_register_uri_handler(server_handle, &wifi_config_uri);
-        httpd_register_uri_handler(server_handle, &wifi_config_html_uri);
         httpd_register_uri_handler(server_handle, &restart_esp_uri);
         httpd_register_uri_handler(server_handle, &get_all_networks_uri);
         httpd_register_uri_handler(server_handle, &wifi_ap_config_uri);

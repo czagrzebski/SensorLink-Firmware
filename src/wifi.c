@@ -97,6 +97,7 @@ esp_err_t set_ip_configuration(char *ip, char* gateway, char* netmask) {
 
 // Function to get all the Wi-Fi networks in the area. Return a char* array of SSIDs
 ssid_list_t* get_wifi_networks(void) {
+
     // Get the Wi-Fi networks in the area
     wifi_scan_config_t scan_config = {
         .ssid = 0,
@@ -134,7 +135,7 @@ ssid_list_t* get_wifi_networks(void) {
 
 void wifi_reconnect(void *pvParameters) {
     ESP_LOGI(WIFI_TAG, "Network Error. Attempting to reconnect to Network...");
-    vTaskDelay(pdMS_TO_TICKS(600000));  // wait for 1 minute
+    vTaskDelay(pdMS_TO_TICKS(30000));  // wait for 1 minute
     esp_wifi_connect(); // attempt to connect to network. if this fails, it will fire a event to connect again. else, it will fire a success event.
     vTaskDelete(NULL);  // destroy current rtos task
 }
@@ -181,6 +182,7 @@ ip_config_t* fetch_ip_info_from_nvs(void) {
     esp_err_t err;
     nvs_handle_t nvs_handle;
     ip_config_t *ip_config = (ip_config_t*) malloc(sizeof(ip_config_t));
+
     memset(ip_config, 0, sizeof(ip_config_t));
     ip_config->mode = DHCP;
     ip_config->gateway = NULL;
@@ -456,6 +458,16 @@ esp_err_t fetch_ap_credentials_from_nvs(char *ssid, char* passphrase) {
     return ESP_OK;
 }
 
+int is_wifi_connected(void) {
+    wifi_ap_record_t ap_info;
+    esp_err_t err = esp_wifi_sta_get_ap_info(&ap_info);
+    if(err == ESP_OK) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 void init_wifi() {
     // Get Wi-Fi Configuration from NVS
     wifi_mode_t mode;
@@ -497,7 +509,6 @@ void init_wifi() {
     
     // Initializer and register event handler for the default network interface
     // Creates a network interface instance by binding the Wi-Fi driver and TCP/IP stack
-    ESP_ERROR_CHECK(esp_event_loop_create_default()); // TODO: move this to app entry, other services may need this event queue
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
     ap_netif = esp_netif_create_default_wifi_ap();
     sta_netif = esp_netif_create_default_wifi_sta();
