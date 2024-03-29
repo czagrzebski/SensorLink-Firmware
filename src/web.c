@@ -431,22 +431,21 @@ esp_err_t get_all_networks_handler(httpd_req_t *req) {
 
     // Send the list of networks as a JSON array
     httpd_resp_set_type(req, "application/json");
-    // build entire json string first
-    char* json = (char*)malloc(1024);
-    strcpy(json, "[");
+    char* json = (char*)malloc(JSON_BUFFER_SIZE);
+    strncpy(json, "[", 2);
     for(int i = 0; i < ssid_list->size; i++) {
-        strcat(json, "\"");
-        strcat(json, ssid_list->ssid_list[i]);
-        strcat(json, "\"");
+        strncat(json, "\"", 2);
+        strncat(json, ssid_list->ssid_list[i], strlen(ssid_list->ssid_list[i]) + 1);
+        strncat(json, "\"", 2);
         if (i < ssid_list->size - 1) {
-            strcat(json, ",");
+            strncat(json, ",", 2);
         }
     }
-    strcat(json, "]");
+    strncat(json, "]", 2);
     httpd_resp_send(req, json, strlen(json));
-    free(json);
     
-    // free each ssid
+    // Cleanup
+    free(json);
     for(int i = 0; i < ssid_list->size; i++) {
         free(ssid_list->ssid_list[i]);
     }

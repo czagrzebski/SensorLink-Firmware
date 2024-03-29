@@ -97,8 +97,8 @@ void init_spiffs() {
 
 void heap_monitor_task(void *pvParameter) {
     while(1) {
-        ESP_LOGI(TAG, "Free heap: %d", (int) esp_get_free_heap_size());
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ESP_LOGI("Heapmon", "Free heap: %d", (int) esp_get_free_heap_size());
+        vTaskDelay(30000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -137,7 +137,7 @@ void app_main() {
     init_wifi();
 
     // Start the web server
-    ESP_LOGI(TAG, "Starting the web server...");
+    ESP_LOGI(TAG, "Starting the web     // build entire json string firstserver...");
     httpd_handle_t server = start_webserver();
     if(server == NULL) {
         ESP_LOGE(TAG, "Failed to start the web server!");
@@ -152,7 +152,7 @@ void app_main() {
     xTaskCreate(broadcast_adc_values, "broadcast_adc_values", 4096, NULL, 5, NULL);
 
     // Create a task to monitor the free heap size
-    //xTaskCreate(heap_monitor_task, "heap_monitor_task", 2048, NULL, 5, NULL);
+    xTaskCreate(heap_monitor_task, "heap_monitor_task", 2048, NULL, 5, NULL);
 
     // Start LED status task
     xTaskCreate(led_status_task, "led_status_task", 2048, led_strip, 5, NULL);
@@ -165,4 +165,6 @@ void app_main() {
     // Unmount the SPIFFS
     ESP_LOGI(TAG, "Unmounting the SPIFFS...");
     esp_vfs_spiffs_unregister(NULL);
+
+    ESP_LOGI(TAG, "Goodbye!");
 }
