@@ -12,7 +12,7 @@
 
 // Used to store the list of available WiFi networks
 typedef struct {
-    char** ssid_list; 
+    char** ssid_names; 
     int size;
 } ssid_list_t;
 
