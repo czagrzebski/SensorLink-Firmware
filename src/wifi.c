@@ -31,7 +31,7 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
         if(ip_config->mode == STATIC) {
             set_ip_configuration(ip_config->ip, ip_config->gateway, ip_config->netmask);
         } else {
-            ESP_LOGI(WIFI_TAG, "DHCP Mode. Not setting IP Configuration");
+            ESP_LOGI(WIFI_TAG, "DHCP Mode Enabled. Ignoring Static IP Configuration.");
         }
         free(ip_config->ip);
         free(ip_config->gateway);
@@ -587,16 +587,12 @@ void wifi_init_sta(char* ssid, char* password) {
             },
         },
     };
-    
-    // Log length of SSID and Password
-    ESP_LOGI(WIFI_TAG, "SSID Length: %d", strlen(ssid));
-    ESP_LOGI(WIFI_TAG, "Password Length: %d", strlen(password));
 
     // If the SSID or Password is empty, set the SSID and Password to "NoNetwork"
     // Otherwise, an empty SSID or Password causes STA to hang
     if(strlen(ssid) == 0 || strlen(password) == 0) {
-        strcpy((char*)wifi_sta_config.sta.ssid, "NoNetwork");
-        strcpy((char*)wifi_sta_config.sta.password, "NoNetwork");
+        strcpy((char*)wifi_sta_config.sta.ssid, "Setup");
+        strcpy((char*)wifi_sta_config.sta.password, "Setup");
     } else {
         // Set the SSID and Password for the Station
         strcpy((char*)wifi_sta_config.sta.ssid, ssid);

@@ -121,6 +121,7 @@ void setup_io() {
 // Main application entry point
 void app_main() {
     ESP_LOGI(TAG, "Hello, from ESP32 SensorLink!");
+    
     // Initialize the Serial Peripheral Interface Flash File System (SPIFFS)
     init_spiffs();
 
