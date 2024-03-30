@@ -12,7 +12,7 @@
 
 // Used to store the list of available WiFi networks
 typedef struct {
-    char** ssid_list; 
+    char** ssid_names; 
     int size;
 } ssid_list_t;
 
@@ -80,7 +80,7 @@ void stop_wifi_ap(void);
  * @param ssid 
  * @param password 
  */
-void save_wifi_credentials_to_nvs(char *ssid, char *password);
+esp_err_t save_wifi_credentials_to_nvs(char *ssid, char *password);
 
 /**
  * @brief Reconnect to the WiFi network
@@ -146,7 +146,7 @@ esp_err_t fetch_sta_credentials_from_nvs(char *ssid, char* passphrase);
  * @param ssid 
  * @param password 
  */
-void save_ap_wifi_credentials_to_nvs(char *ssid, char *password);
+esp_err_t save_ap_wifi_credentials_to_nvs(char *ssid, char *password);
 
 /**
  * @brief Switches Wi-Fi Mode to AP STA
@@ -179,7 +179,7 @@ network_info_t* get_network_info(void);
  * @param subnet - subnet
  * @param mode - mode
  */
-void save_ip_info_to_nvs(char* static_ip, char* gateway, char* subnet, uint8_t mode);
+esp_err_t save_ip_info_to_nvs(char* static_ip, char* gateway, char* subnet, uint8_t mode);
 
 /**
  * @brief Fetches the IP configuration from the Non-Volatile Storage (NVS)

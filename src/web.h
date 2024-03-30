@@ -10,6 +10,7 @@
 
 #define WEB_TAG "web"
 #define WS_INTERVAL_MS 1000
+#define JSON_BUFFER_SIZE 4096
 
 // ADC calibration characteristics for ADC1
 extern esp_adc_cal_characteristics_t adc1_chars;

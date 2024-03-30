@@ -973,6 +973,14 @@
                     onMethodChange();
                 }
 
+                ws.onclose = function () {
+                    console.log("Disconnected from the WebSocket server");
+                    // RECONNECT
+                    setTimeout(() => {
+                        ws = new WebSocket(new_uri);
+                    }, 5000);
+                };
+
 
                 updateTime();
                 setInitialMethod();

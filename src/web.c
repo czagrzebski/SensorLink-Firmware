@@ -11,7 +11,7 @@
 #include "esp_adc_cal.h"
 #include "driver/adc.h"
 
-// Import MIN function
+// MIN macro
 #ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #endif 
@@ -19,8 +19,7 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-// Define GIT_COMMIT_HASH if it's not already defined
-// stops GCC from whining about an undefined macro
+// Git commit hash from CMake
 #ifndef GIT_COMMIT_HASH
 #define GIT_COMMIT_HASH "undefined"
 #endif
@@ -429,29 +428,33 @@ esp_err_t restart_esp_handler(httpd_req_t *req) {
 esp_err_t get_all_networks_handler(httpd_req_t *req) {
     ssid_list_t* ssid_list = get_wifi_networks();
 
+    if (ssid_list == NULL) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
     // Send the list of networks as a JSON array
     httpd_resp_set_type(req, "application/json");
-    // build entire json string first
-    char* json = (char*)malloc(1024);
-    strcpy(json, "[");
+    char* json = (char*)malloc(JSON_BUFFER_SIZE);
+    strncpy(json, "[", 2);
     for(int i = 0; i < ssid_list->size; i++) {
-        strcat(json, "\"");
-        strcat(json, ssid_list->ssid_list[i]);
-        strcat(json, "\"");
+        strncat(json, "\"", 2);
+        strncat(json, ssid_list->ssid_names[i], strlen(ssid_list->ssid_names[i]) + 1);
+        strncat(json, "\"", 2);
         if (i < ssid_list->size - 1) {
-            strcat(json, ",");
+            strncat(json, ",", 2);
         }
     }
-    strcat(json, "]");
+    strncat(json, "]", 2);
     httpd_resp_send(req, json, strlen(json));
-    free(json);
     
-    // free each ssid
+    // Cleanup
+    free(json);
     for(int i = 0; i < ssid_list->size; i++) {
-        free(ssid_list->ssid_list[i]);
+        free(ssid_list->ssid_names[i]);
     }
     // free the list
-    free(ssid_list->ssid_list);
+    free(ssid_list->ssid_names);
     free(ssid_list);
     return ESP_OK;
 }

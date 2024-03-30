@@ -98,6 +98,8 @@ esp_err_t set_ip_configuration(char *ip, char* gateway, char* netmask) {
 // Function to get all the Wi-Fi networks in the area. Return a char* array of SSIDs
 ssid_list_t* get_wifi_networks(void) {
 
+    esp_err_t err;
+
     // Get the Wi-Fi networks in the area
     wifi_scan_config_t scan_config = {
         .ssid = 0,
@@ -105,30 +107,42 @@ ssid_list_t* get_wifi_networks(void) {
         .channel = 0,
         .show_hidden = false
     };
+
+    ESP_LOGI(WIFI_TAG, "Scanning for Wi-Fi Networks...");
     
     // Start the scanning process
-    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
+    if((err = esp_wifi_scan_start(&scan_config, true)) != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Failed to start scanning process. Error: %s", esp_err_to_name(err));
+        return NULL;
+    }
 
     // Get the number of APs found by the scan
     uint16_t num_ap; 
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&num_ap));
+    if((err = esp_wifi_scan_get_ap_num(&num_ap)) != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Failed to get number of APs found. Error: %s", esp_err_to_name(err));
+        return NULL;
+    }
+
+    ESP_LOGI(WIFI_TAG, "Scan Complete. Number of APs found: %d", num_ap);
 
     // Allocate a list of wifi_ap
     wifi_ap_record_t *ap_records = (wifi_ap_record_t*) malloc(sizeof(wifi_ap_record_t) * num_ap);
 
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&num_ap, ap_records));
+    if((err = esp_wifi_scan_get_ap_records(&num_ap, ap_records)) != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Failed to get AP records. Error: %s", esp_err_to_name(err));
+        return NULL;
+    }
 
     char** ssid_names = malloc(sizeof(char*) * num_ap);
 
     for(int i=0; i < num_ap; i++) {
-        ESP_LOGI(WIFI_TAG, "SSID: %s", ap_records[i].ssid);
-        ssid_names[i] = (char*)malloc(33 * sizeof(char)); 
+        ssid_names[i] = (char*)malloc((MAX_SSID_LEN + 1) * sizeof(char)); 
         strcpy(ssid_names[i], (char*)ap_records[i].ssid);
     }
 
     ssid_list_t* ssid_list = (ssid_list_t*) malloc(sizeof(ssid_list_t));
     ssid_list->size = num_ap;
-    ssid_list->ssid_list = ssid_names;
+    ssid_list->ssid_names = ssid_names;
     free(ap_records);
     return ssid_list;
 }
@@ -141,41 +155,49 @@ void wifi_reconnect(void *pvParameters) {
 }
 
 
-void save_ip_info_to_nvs(char* static_ip, char* gateway, char* subnet, uint8_t mode) {
+esp_err_t save_ip_info_to_nvs(char* static_ip, char* gateway, char* subnet, uint8_t mode) {
     esp_err_t err;
     nvs_handle_t nvs_handle;
-    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
+ 
+    if ((err = nvs_open("wifi", NVS_READWRITE, &nvs_handle)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
-        return;
+        nvs_close(nvs_handle);
+        return err;
     }
 
-    err = nvs_set_str(nvs_handle, "static_ip", static_ip);
-    if (err != ESP_OK) {
+    if ((err = nvs_set_str(nvs_handle, "static_ip", static_ip)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) saving static ip to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
-    err = nvs_set_str(nvs_handle, "gateway", gateway);
-    if (err != ESP_OK) {
+    if ((err = nvs_set_str(nvs_handle, "gateway", gateway)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) saving gateway to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
-    err = nvs_set_str(nvs_handle, "netmask", subnet);
-    if (err != ESP_OK) {
+    if ((err = nvs_set_str(nvs_handle, "netmask", subnet)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) saving netmask to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
-    err = nvs_set_u8(nvs_handle, "mode", mode);
-    if (err != ESP_OK) {
+    if ((err = nvs_set_u8(nvs_handle, "mode", mode) != ESP_OK)) {
         ESP_LOGE(WIFI_TAG, "Error (%s) saving mode to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
     err = nvs_commit(nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) committing changes to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
     nvs_close(nvs_handle);
+    return ESP_OK;
 }
 
 ip_config_t* fetch_ip_info_from_nvs(void) {
@@ -189,10 +211,10 @@ ip_config_t* fetch_ip_info_from_nvs(void) {
     ip_config->ip = NULL;
     ip_config->netmask = NULL;
 
-
-    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
+    if ((err = nvs_open("wifi", NVS_READWRITE, &nvs_handle)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return NULL;
     }
 
     size_t required_size;
@@ -281,14 +303,11 @@ network_info_t* get_network_info(void) {
     // Get MAC Address
     net_info->mac_address = get_mac_addr();
 
-    // Get SSID for AP/STA
+    // Get AP Credentials
     net_info->station_ssid = (char*) malloc(MAX_SSID_LEN * sizeof(char));
     strcpy(net_info->station_ssid, (char*) sta_conf->sta.ssid);
-
     net_info->ap_ssid = (char*) malloc(MAX_SSID_LEN * sizeof(char));
     strcpy(net_info->ap_ssid, (char*) ap_conf->ap.ssid);
-
-    // GET AP PASSWORD
     net_info->ap_passkey = (char*) malloc(MAX_SSID_LEN * sizeof(char));
     strcpy(net_info->ap_passkey, (char*) ap_conf->ap.password);
 
@@ -308,70 +327,81 @@ wifi_mode_t get_wifi_mode(void) {
     return mode;
 }
 
-void save_wifi_credentials_to_nvs(char *ssid, char *password) {
+esp_err_t save_wifi_credentials_to_nvs(char *ssid, char *password) {
     // Save Wi-Fi Configuration to NVS and restart
     nvs_handle_t nvs_handle;
     esp_err_t err;
-    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
+  
+    if ((err = nvs_open("wifi", NVS_READWRITE, &nvs_handle)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
-        return;
+        return err;
     }
 
     // Save the Wi-Fi Configuration to NVS
-    err = nvs_set_str(nvs_handle, "ssid", ssid);
-    if (err != ESP_OK) {
+    if ((err = nvs_set_str(nvs_handle, "ssid", ssid)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) saving ssid to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
-    err = nvs_set_str(nvs_handle, "password", password);
-    if (err != ESP_OK) {
+    if ((err = nvs_set_str(nvs_handle, "password", password)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) saving password to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
     // Commit the changes to NVS
-    err = nvs_commit(nvs_handle);
-    if (err != ESP_OK) {
+    if ((err = nvs_commit(nvs_handle)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) committing changes to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
     nvs_close(nvs_handle);
+    return ESP_OK;
 }
 
-void save_ap_wifi_credentials_to_nvs(char *ssid, char *password) {
+esp_err_t save_ap_wifi_credentials_to_nvs(char *ssid, char *password) {
     // Save Wi-Fi Configuration to NVS and restart
     nvs_handle_t nvs_handle;
     esp_err_t err;
-    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
+
+    // Open the namespace
+    if ((err = nvs_open("wifi", NVS_READWRITE, &nvs_handle)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
-        return;
+        return err;
     }
 
     // Save the Wi-Fi Configuration to NVS
-    err = nvs_set_str(nvs_handle, "ap_ssid", ssid);
-    if (err != ESP_OK) {
+    if ((err = nvs_set_str(nvs_handle, "ap_ssid", ssid)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) saving ssid to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
-    err = nvs_set_str(nvs_handle, "ap_password", password);
-    if (err != ESP_OK) {
+    if ((err = nvs_set_str(nvs_handle, "ap_password", password)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) saving password to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
     // Commit the changes to NVS
-    err = nvs_commit(nvs_handle);
-    if (err != ESP_OK) {
+    if ((err = nvs_commit(nvs_handle)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) committing changes to NVS", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
     }
 
     nvs_close(nvs_handle);
+    return ESP_OK;
 }
 
 esp_err_t fetch_sta_credentials_from_nvs(char *ssid, char* passphrase) {
     size_t required_size;
     nvs_handle_t nvs_handle;
     esp_err_t err;
+
+    ESP_LOGI(WIFI_TAG, "Fetching Wi-Fi Configuration from NVS");
 
     // Open the NVS Namespace
     ESP_LOGI(WIFI_TAG, "Opening NVS Namespace");
@@ -394,7 +424,6 @@ esp_err_t fetch_sta_credentials_from_nvs(char *ssid, char* passphrase) {
         ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
     }
 
-    ESP_LOGI(WIFI_TAG, "Retrieving Password");
     err = nvs_get_str(nvs_handle, "password", NULL, &required_size);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGE(WIFI_TAG, "Error (%s) reading passphrase from NVS", esp_err_to_name(err));
@@ -407,8 +436,6 @@ esp_err_t fetch_sta_credentials_from_nvs(char *ssid, char* passphrase) {
 
     nvs_close(nvs_handle);
  
-    ESP_LOGI(WIFI_TAG, "%s %s", passphrase, ssid);
-
     return ESP_OK;
 }
 
@@ -418,37 +445,35 @@ esp_err_t fetch_ap_credentials_from_nvs(char *ssid, char* passphrase) {
     esp_err_t err;
 
     // Open the NVS Namespace
-    ESP_LOGI(WIFI_TAG, "Opening NVS Namespace");
-    err = nvs_open("wifi", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
+    ESP_LOGI(WIFI_TAG, "Fetching Wi-Fi Configuration from NVS");
+    if ((err = nvs_open("wifi", NVS_READWRITE, &nvs_handle)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) opening NVS handle", esp_err_to_name(err));
         return ESP_FAIL;
     } 
 
     // Get the size of the SSID
-    err = nvs_get_str(nvs_handle, "ap_ssid", NULL, &required_size);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+    if ((err = nvs_get_str(nvs_handle, "ap_ssid", NULL, &required_size)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
         return ESP_FAIL;
     }
 
     // Read the stored Wi-Fi credentials from NVS
-    err = nvs_get_str(nvs_handle, "ap_ssid", ssid, &required_size);
-    if (err != ESP_OK) {
+    if((err = nvs_get_str(nvs_handle, "ap_ssid", ssid, &required_size)) != ESP_OK) {
         strcpy(ssid, AP_SSID);
         ESP_LOGE(WIFI_TAG, "Error (%s) reading ssid from NVS", esp_err_to_name(err));
+        return ESP_FAIL;
     }
 
-    ESP_LOGI(WIFI_TAG, "Retrieving Password");
-    err = nvs_get_str(nvs_handle, "ap_password", NULL, &required_size);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+    if ((err = nvs_get_str(nvs_handle, "ap_password", NULL, &required_size)) != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Error (%s) reading passphrase from NVS", esp_err_to_name(err));
+        return ESP_FAIL;
     }
 
-    err = nvs_get_str(nvs_handle, "ap_password", passphrase, &required_size);
-    if (err != ESP_OK) {
+
+    if ((err = nvs_get_str(nvs_handle, "ap_password", passphrase, &required_size)) != ESP_OK) {
         strcpy(passphrase, AP_PASSPHRASE);
         ESP_LOGE(WIFI_TAG, "Error (%s) reading passphrase from NVS", esp_err_to_name(err));
+        return ESP_FAIL;
     }
 
     nvs_close(nvs_handle);
@@ -536,12 +561,17 @@ void init_wifi() {
 }
 
 char* get_mac_addr(void) {
-    char* mac_addr_str = (char*)malloc(18 * sizeof(char));
+    char* mac_addr_str;
     uint8_t mac[6];
-    esp_wifi_get_mac(WIFI_IF_STA, mac);
+
+    if(esp_wifi_get_mac(WIFI_IF_STA, mac) != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Failed to get MAC Address");
+        return NULL;
+    }
+
+    mac_addr_str = (char*)malloc(18 * sizeof(char));
     sprintf(mac_addr_str, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     return mac_addr_str;
-
 }
 
 void wifi_init_sta(char* ssid, char* password) {
