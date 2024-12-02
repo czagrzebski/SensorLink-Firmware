@@ -1,3 +1,15 @@
+/**
+ * @file wifi.c
+ * @author Creed Zagrzebski (czagrzebski@gmail.com)
+ * @brief Network Utility for the Espressif ESP32
+ * @version 0.1
+ * @date 2023-12-23
+ * 
+ * @copyright Creed Zagrzebski (c) 2024
+ * 
+ */
+
+
 #include "wifi.h"
 
 #include "esp_wifi.h"
@@ -352,7 +364,7 @@ esp_err_t save_wifi_credentials_to_nvs(char *ssid, char *password) {
 
     // Commit the changes to NVS
     if ((err = nvs_commit(nvs_handle)) != ESP_OK) {
-        ESP_LOGE(WIFI_TAG, "Error (%s) committing changes to NVS", esp_err_to_name(err));
+        ESP_LOGE(WIFI_TAG, "Error (%s) committing station credentials to NVS", esp_err_to_name(err));
         nvs_close(nvs_handle);
         return err;
     }
@@ -387,7 +399,7 @@ esp_err_t save_ap_wifi_credentials_to_nvs(char *ssid, char *password) {
 
     // Commit the changes to NVS
     if ((err = nvs_commit(nvs_handle)) != ESP_OK) {
-        ESP_LOGE(WIFI_TAG, "Error (%s) committing changes to NVS", esp_err_to_name(err));
+        ESP_LOGE(WIFI_TAG, "Error (%s) committing AP credentials to NVS", esp_err_to_name(err));
         nvs_close(nvs_handle);
         return err;
     }

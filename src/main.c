@@ -41,13 +41,13 @@ led_strip_handle_t configure_led(void) {
 
     // LED strip backend configuration: RMT
     led_strip_rmt_config_t rmt_config = {
-#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
-        .rmt_channel = 0,
-#else
-        .clk_src = RMT_CLK_SRC_DEFAULT,        // different clock source can lead to different power consumption
-        .resolution_hz = LED_STRIP_RMT_RES_HZ, // RMT counter clock frequency
-        .flags.with_dma = false,               // DMA feature is available on ESP target like ESP32-S3
-#endif
+        #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+                .rmt_channel = 0,
+        #else
+                .clk_src = RMT_CLK_SRC_DEFAULT,        
+                .resolution_hz = LED_STRIP_RMT_RES_HZ, 
+                .flags.with_dma = true,               
+        #endif
     };
 
     // LED Strip object handle
@@ -138,7 +138,7 @@ void app_main() {
     init_wifi();
 
     // Start the web server
-    ESP_LOGI(TAG, "Starting the web     // build entire json string firstserver...");
+    ESP_LOGI(TAG, "Starting the web server...");
     httpd_handle_t server = start_webserver();
     if(server == NULL) {
         ESP_LOGE(TAG, "Failed to start the web server!");
